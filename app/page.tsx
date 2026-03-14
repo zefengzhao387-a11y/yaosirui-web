@@ -1,140 +1,74 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
-const images = [
-  {
-    src: "photo1.jpg",
-    alt: "美女打球",
-  },
-  {
-    src: "photo2.jpg",
-    alt: "美女自恋",
-  },
-  {
-    src: "photo3.jpg",
-    alt: "美女摸狗",
-  },
-  {
-    src: "/photo4.jpg",
-    alt: "美女写真",
-  },
-];
+import Hero from "@/components/Hero";
+import Starfield from "@/components/Starfield";
+import FeatureSection from "@/components/FeatureSection";
+import EmotionBubbles from "@/components/EmotionBubbles";
+import { motion, useScroll, useSpring } from "framer-motion";
 
 export default function Home() {
-  const [message, setMessage] = useState<string>("加载中...");
-  const [time, setTime] = useState<string>("");
-  const [current, setCurrent] = useState<number>(0);
-
-  useEffect(() => {
-    fetch("/api/hello")
-      .then((res) => res.json())
-      .then((data) => setMessage(data.message))
-      .catch(() => setMessage("请求失败"));
-
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString("zh-CN"));
-    }, 1000);
-
-    const auto = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % images.length);
-    }, 4000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(auto);
-    };
-  }, []);
-
-  const handlePrev = () => {
-    setCurrent((prev) => (prev - 1 + images.length) % images.length);
-  };
-
-  const handleNext = () => {
-    setCurrent((prev) => (prev + 1) % images.length);
-  };
-
-  const SLIDE_WIDTH = 380;
-  const STEP = 300;
-  const VIEWPORT_WIDTH = 900;
-  const OFFSET_CENTER = (VIEWPORT_WIDTH - SLIDE_WIDTH) / 2;
-  const translateX = -(current * STEP) + OFFSET_CENTER;
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-slate-50 to-slate-200 dark:from-slate-900 dark:to-slate-800">
-      <div className="w-full max-w-4xl space-y-10">
-        <div className="text-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-wide text-slate-900 dark:text-slate-50 drop-shadow-sm">
-            Hi! 姚思睿
-          </h1>
-        </div>
-        <div className="rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur shadow-xl border border-slate-200 dark:border-slate-700 p-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-            欢迎
-          </h1>
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
-            Next.js 15 · React 19 · TypeScript · Tailwind CSS
-          </p>
-          <p className="text-lg text-emerald-600 dark:text-emerald-400 font-medium mb-1">
-            {message}
-          </p>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            当前时间：{time || "—"}
-          </p>
-        </div>
+    <main className="relative min-h-screen bg-morandi-cream dark:bg-morandi-midnightBlue transition-colors duration-700">
+      {/* Progress Bar */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 bg-morandi-sage z-50 origin-left"
+        style={{ scaleX }}
+      />
 
-        <div
-          className="relative flex items-center justify-center overflow-hidden mx-auto w-full max-w-[900px]"
-          style={{ width: VIEWPORT_WIDTH, height: 280 }}
+      {/* Background Starfield */}
+      <div className="fixed inset-0 pointer-events-none">
+        <Starfield />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        <Hero />
+        
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          className="bg-white/30 backdrop-blur-sm border-y border-morandi-sage/20"
         >
-          <div
-            className="absolute flex items-center"
-            style={{
-              height: 280,
-              left: 0,
-              transform: `translateX(${translateX}px)`,
-              transition: "transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-            }}
-          >
-            {images.map((img, index) => {
-              const diff = index - current;
-              const isCenter = diff === 0;
-              const scale = isCenter ? 1 : 0.72;
-              const opacity = isCenter ? 1 : 0.5;
-              const z = isCenter ? 20 : 10;
-              return (
-                <div
-                  key={img.src}
-                  className="absolute rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-700/80 shadow-xl transition-all duration-500 ease-out cursor-pointer"
-                  onClick={() => {
-                    if (diff === -1) {
-                      handlePrev();
-                    } else if (diff === 1) {
-                      handleNext();
-                    }
-                  }}
-                  style={{
-                    left: index * STEP,
-                    width: SLIDE_WIDTH,
-                    height: 280,
-                    transform: `scale(${scale})`,
-                    transformOrigin: "center center",
-                    opacity,
-                    zIndex: z,
-                  }}
-                >
-                  <img
-                    src={img.src}
-                    alt={img.alt}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                </div>
-              );
-            })}
+          <FeatureSection />
+        </motion.div>
+
+        {/* Emotion Bubbles Showcase */}
+        <section className="py-24 px-4 max-w-5xl mx-auto text-center">
+          <div className="mb-12">
+            <h2 className="text-4xl md:text-5xl font-serif text-morandi-midnightBlue dark:text-morandi-cream mb-4">
+              情感场域
+            </h2>
+            <p className="text-morandi-sage max-w-xl mx-auto">
+              每一段回忆都有其独特的色调。点击气泡，释放深藏已久的情感。
+            </p>
           </div>
-        </div>
+          <EmotionBubbles />
+        </section>
+
+        {/* Call to Action Footer */}
+        <section className="py-24 text-center px-4">
+          <h2 className="text-4xl md:text-6xl font-serif text-morandi-midnightBlue dark:text-morandi-cream mb-8">
+            开始编织你的<br />生命乐章
+          </h2>
+          <p className="text-morandi-sage mb-12 max-w-lg mx-auto">
+            加入我们，将珍贵的回忆保存在这个永恒的数字化空间。
+          </p>
+          <button className="neo-brutalism px-12 py-4 bg-morandi-sage text-white font-bold text-xl rounded-none">
+            立即注册
+          </button>
+        </section>
+
+        <footer className="py-12 border-t border-morandi-sage/10 text-center text-morandi-sage/60 text-sm">
+          <p>© 2026 Time Capsule: Eternal Symphony. All rights reserved.</p>
+        </footer>
       </div>
     </main>
   );

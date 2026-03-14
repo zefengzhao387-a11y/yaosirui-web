@@ -3,18 +3,43 @@
 @tailwind utilities;
 
 :root {
-  --foreground: #0a0a0a;
-  --background: #fafafa;
+  --background: #fdf5e6; /* morandi.cream */
+  --foreground: #4a4a4a;
+  --sage: #9bb0a5;
+  --cool-gray: #d1d5db;
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground: #ededed;
-    --background: #0a0a0a;
+    --background: #191970; /* morandi.midnightBlue */
+    --foreground: #fdf5e6;
   }
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
+  font-family: var(--font-sans);
+  transition: background-color 0.5s ease, color 0.5s ease;
+  overflow-x: hidden;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.neo-brutalism {
+  border: 2px solid #000;
+  box-shadow: 4px 4px 0px #000;
+  transition: all 0.2s ease;
+}
+
+.neo-brutalism:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px #000;
 }
