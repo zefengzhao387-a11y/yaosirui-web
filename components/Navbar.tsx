@@ -17,6 +17,12 @@ export default function Navbar() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
+          <Link 
+            href="/timeline" 
+            className="text-morandi-midnightBlue dark:text-morandi-cream hover:text-morandi-sage transition-colors text-sm font-medium"
+          >
+            多维时空轴
+          </Link>
           {["影廊", "心语", "阁楼", "留言"].map((item) => (
             <Link 
               key={item} 
@@ -26,9 +32,12 @@ export default function Navbar() {
               {item}
             </Link>
           ))}
-          <button className="bg-morandi-midnightBlue text-morandi-cream px-6 py-2 rounded-full text-sm font-medium hover:bg-opacity-90 transition-all">
+          <Link 
+            href="/login" 
+            className="bg-morandi-midnightBlue text-morandi-cream px-6 py-2 rounded-full text-sm font-medium hover:bg-opacity-90 transition-all"
+          >
             开始使用
-          </button>
+          </Link>
         </div>
 
         {/* Mobile Nav */}
