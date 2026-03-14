@@ -22,8 +22,6 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-screen bg-morandi-cream dark:bg-morandi-midnightBlue flex items-center justify-center p-4">
-      <Navbar />
-      
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
