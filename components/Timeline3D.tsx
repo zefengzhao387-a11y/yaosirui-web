@@ -75,11 +75,46 @@ function MemoryNode({ position, year, title, color, onClick }: MemoryNodeProps) 
 }
 
 const memoryData = [
-  { year: "2020", title: "初遇：在春天的午后", color: "#9bb0a5", pos: [0, 0, 0] as [number, number, number] },
-  { year: "2021", title: "旅行：海边的篝火", color: "#d4a5a5", pos: [2, 1, -5] as [number, number, number] },
-  { year: "2022", title: "奋斗：深夜的台灯", color: "#dcd0c0", pos: [-3, -1, -10] as [number, number, number] },
-  { year: "2023", title: "收获：第一份成功的喜悦", color: "#d1d5db", pos: [4, 2, -15] as [number, number, number] },
-  { year: "2024", title: "展望：星辰大海的征程", color: "#fdf5e6", pos: [-1, 0, -20] as [number, number, number] },
+  { 
+    year: "2020", 
+    title: "初遇：在春天的午后", 
+    color: "#9bb0a5", 
+    pos: [0, 0, 0] as [number, number, number],
+    highlights: ["/photo1.jpg", "/photo2.jpg"],
+    summary: "那一年，我们在春天的午后初次相遇。樱花飘落，微风不燥。那是所有故事的开始，每一张照片都记录着当时羞涩的笑容。"
+  },
+  { 
+    year: "2021", 
+    title: "旅行：海边的篝火", 
+    color: "#d4a5a5", 
+    pos: [5, 2, -5] as [number, number, number],
+    highlights: ["/photo3.jpg", "/photo4.jpg"],
+    summary: "2021年的夏天，我们去了向往已久的海边。夜晚的篝火映照着彼此的面孔，海浪声成了我们谈话的背景音乐。"
+  },
+  { 
+    year: "2022", 
+    title: "奋斗：深夜的台灯", 
+    color: "#dcd0c0", 
+    pos: [-5, -2, -10] as [number, number, number],
+    highlights: ["/photo1.jpg", "/photo3.jpg"],
+    summary: "这一年是忙碌而充实的。无数个深夜，只有那一盏台灯陪伴着我们。虽然辛苦，但每一步都走得异常坚定。"
+  },
+  { 
+    year: "2023", 
+    title: "收获：第一份成功的喜悦", 
+    color: "#d1d5db", 
+    pos: [8, 4, -15] as [number, number, number],
+    highlights: ["/photo2.jpg", "/photo4.jpg"],
+    summary: "努力终于迎来了回报。那一刻的欢呼与泪水，都凝聚在这些珍贵的影像中。这是属于我们的高光时刻。"
+  },
+  { 
+    year: "2024", 
+    title: "展望：星辰大海的征程", 
+    color: "#fdf5e6", 
+    pos: [-3, 1, -20] as [number, number, number],
+    highlights: ["/photo1.jpg", "/photo4.jpg"],
+    summary: "2024，我们站在新的起点。未来的路还很长，但只要心中有光，脚下就有力量。我们将继续编织这段永恒的交响。"
+  },
 ];
 
 function TimelineScene({ onNodeClick }: { onNodeClick: (data: any) => void }) {
@@ -166,26 +201,40 @@ export default function Timeline3D() {
                   </div>
                   
                   <div className="p-6 bg-morandi-sage/10 rounded-3xl border border-morandi-sage/20 italic text-morandi-midnightBlue/70 dark:text-morandi-cream/70 leading-relaxed">
-                    "那是一个阳光明媚的下午，空气中弥漫着泥土和草木的香气。我们走在熟悉的小路上，仿佛时间在那一刻停滞了..."
+                    "{selectedNode.summary}"
                   </div>
 
-                  <div className="flex gap-4">
-                    <button className="flex-1 py-3 bg-morandi-midnightBlue text-morandi-cream rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all">
-                      播放语音旁白
+                  <div className="flex flex-col gap-4">
+                    <button 
+                      onClick={() => window.location.href = `/timeline/${selectedNode.year}`}
+                      className="w-full py-4 bg-morandi-midnightBlue text-morandi-cream rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-opacity-90 transition-all shadow-lg"
+                    >
+                      深入记忆星团 <ArrowRight size={20} />
                     </button>
-                    <button className="flex-1 py-3 border border-morandi-sage/30 rounded-2xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all">
-                      编辑记忆
-                    </button>
+                    <div className="flex gap-4">
+                      <button className="flex-1 py-3 border border-morandi-sage/30 rounded-2xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all">
+                        播放语音旁白
+                      </button>
+                      <button className="flex-1 py-3 border border-morandi-sage/30 rounded-2xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all">
+                        编辑记忆
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="aspect-[3/4] bg-slate-200 rounded-3xl overflow-hidden shadow-inner flex items-center justify-center text-slate-400 font-serif">
-                    Photo 1
-                  </div>
-                  <div className="aspect-[3/4] bg-slate-200 rounded-3xl overflow-hidden shadow-inner mt-8 flex items-center justify-center text-slate-400 font-serif">
-                    Photo 2
-                  </div>
+                  {selectedNode.highlights.map((img: string, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className={`aspect-[3/4] rounded-3xl overflow-hidden shadow-xl border-4 border-white dark:border-slate-800 transform ${idx === 1 ? 'mt-12' : ''} hover:rotate-2 transition-transform duration-500`}
+                    >
+                      <img 
+                        src={img} 
+                        alt={`Highlight ${idx}`} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             </motion.div>
