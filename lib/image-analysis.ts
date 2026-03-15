@@ -57,8 +57,13 @@ export async function getImageTags(source: string): Promise<string[]> {
       img.onerror = () => reject(new Error("Image load failed"));
       img.src = source;
     });
-    const out = await pipe(source, { max_new_tokens: 30 });
-    const text = Array.isArray(out) ? (out[0]?.generated_text ?? out[0] ?? "") : (out?.generated_text ?? String(out ?? ""));
+    const out = await pipe(source, { max_new_tokens: 30 }) as unknown;
+    const first = Array.isArray(out) ? out[0] : out;
+    const text = typeof first === "object" && first !== null && "generated_text" in first
+      ? String((first as { generated_text?: string }).generated_text ?? "")
+      : typeof first === "string"
+        ? first
+        : String(out ?? "");
     if (!text || typeof text !== "string") return [];
     // 英文描述转成简短中文标签（可后续用 LLM 或简单映射）
     const words = text
