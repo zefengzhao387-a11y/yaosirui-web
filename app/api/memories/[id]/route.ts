@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
+const DEMO_USER_ID = "demo-local";
+
 function getUserIdOrThrow(session: any) {
   const userId = session?.user?.id;
   if (!userId || typeof userId !== "string") throw new Error("UNAUTHORIZED");
@@ -27,6 +29,18 @@ export async function PATCH(
     body = raw ? JSON.parse(raw) : {};
   } catch {
     return NextResponse.json({ error: "请求体不是合法 JSON" }, { status: 400 });
+  }
+
+  // 本地演示账号：对 demo-mem-* 只做前端生效，不写库
+  if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID && id.startsWith("demo-mem-")) {
+    const title = typeof body.title === "string" ? body.title.trim() : "";
+    const text = typeof body.text === "string" ? body.text : "";
+    const location = typeof body.location === "string" ? body.location : "";
+    const url = typeof body.url === "string" ? body.url : "";
+    if (!title) return NextResponse.json({ error: "标题不能为空" }, { status: 400 });
+    return NextResponse.json({
+      memory: { id, type: url ? "image" : "text", url, title, date: "", location, text },
+    });
   }
 
   const existing = await prisma.memory.findFirst({ where: { id, userId } });
@@ -79,11 +93,13 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID && id.startsWith("demo-mem-")) {
+    return NextResponse.json({ ok: true });
+  }
   const existing = await prisma.memory.findFirst({ where: { id, userId } });
   if (!existing) {
     return NextResponse.json({ error: "不存在" }, { status: 404 });
   }
-
   await prisma.memory.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

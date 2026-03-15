@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PerspectiveCamera, Stars, Html, Float, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { getEmotionFromText, getTheme } from "@/lib/emotion";
 
 const INITIAL_MEMORIES = [
   { id: 1, type: "image", url: "/photo1.jpg", title: "春日漫步", date: "04-12", location: "中央公园", text: "那是我们第一次一起看樱花。" },
@@ -55,10 +56,40 @@ function CameraRig({ targetPos, onComplete, controlsRef }: { targetPos: [number,
   return null;
 }
 
-function FloatingMemory({ memory, position, onClick }: { memory: any; position: [number, number, number]; onClick: () => void }) {
+function FloatingMemory({
+  memory,
+  position,
+  onClick,
+  flyTargetMemoryId,
+  onTargetPosition,
+}: {
+  memory: any;
+  position: [number, number, number];
+  onClick: () => void;
+  flyTargetMemoryId: string | null;
+  onTargetPosition: ((x: number, y: number) => void) | null;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const reportedRef = useRef(false);
+  const { camera, gl } = useThree();
+
+  useFrame(() => {
+    if (!flyTargetMemoryId || memory.id !== flyTargetMemoryId || !onTargetPosition || reportedRef.current) return;
+    const group = groupRef.current;
+    if (!group) return;
+    const worldPos = new THREE.Vector3();
+    group.getWorldPosition(worldPos);
+    worldPos.project(camera);
+    const rect = gl.domElement.getBoundingClientRect();
+    const x = rect.left + (worldPos.x + 1) * 0.5 * rect.width;
+    const y = rect.top + (1 - worldPos.y) * 0.5 * rect.height;
+    reportedRef.current = true;
+    onTargetPosition(x, y);
+  });
+
   return (
     <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-      <group position={position}>
+      <group ref={groupRef} position={position}>
         <Html transform distanceFactor={40} occlude>
           <motion.div
             whileHover={{ scale: 1.05 }}
@@ -82,7 +113,23 @@ function FloatingMemory({ memory, position, onClick }: { memory: any; position: 
 }
 
 // 日期星团组件
-function DateCluster({ date, memories, clusterPos, angle, onMemoryClick }: { date: string, memories: any[], clusterPos: [number, number, number], angle: number, onMemoryClick: (m: any) => void }) {
+function DateCluster({
+  date,
+  memories,
+  clusterPos,
+  angle,
+  onMemoryClick,
+  flyTargetMemoryId,
+  onTargetPosition,
+}: {
+  date: string;
+  memories: any[];
+  clusterPos: [number, number, number];
+  angle: number;
+  onMemoryClick: (m: any) => void;
+  flyTargetMemoryId: string | null;
+  onTargetPosition: ((x: number, y: number) => void) | null;
+}) {
   const points = useMemo(() => {
     const count = memories.length;
     const radius = 3;
@@ -109,14 +156,65 @@ function DateCluster({ date, memories, clusterPos, angle, onMemoryClick }: { dat
       </Html>
       
       {memories.map((memory, i) => (
-        <FloatingMemory 
-          key={memory.id} 
-          memory={memory} 
-          position={points[i] as [number, number, number]} 
-          onClick={() => onMemoryClick(memory)} 
+        <FloatingMemory
+          key={memory.id}
+          memory={memory}
+          position={points[i] as [number, number, number]}
+          onClick={() => onMemoryClick(memory)}
+          flyTargetMemoryId={flyTargetMemoryId}
+          onTargetPosition={onTargetPosition}
         />
       ))}
     </group>
+  );
+}
+
+// Canvas 内场景：接收 flyTargetMemoryId / onTargetPosition，传给 DateCluster 以报告新卡片屏幕坐标
+function TimelineScene({
+  groupedMemories,
+  setSelectedMemory,
+  targetClusterPos,
+  setTargetClusterPos,
+  controlsRef,
+  flyTargetMemoryId,
+  onTargetPosition,
+}: {
+  groupedMemories: { date: string; memories: any[]; pos: [number, number, number]; angle: number }[];
+  setSelectedMemory: (m: any) => void;
+  targetClusterPos: [number, number, number] | null;
+  setTargetClusterPos: (v: [number, number, number] | null) => void;
+  controlsRef: React.RefObject<any>;
+  flyTargetMemoryId: string | null;
+  onTargetPosition: (x: number, y: number) => void;
+}) {
+  return (
+    <>
+      <PerspectiveCamera makeDefault position={[0, 0, 30]} fov={50} />
+      <CameraRig targetPos={targetClusterPos} onComplete={() => setTargetClusterPos(null)} controlsRef={controlsRef} />
+      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      <ambientLight intensity={1.5} />
+      <pointLight position={[10, 10, 10]} intensity={2} />
+      {groupedMemories.map((group) => (
+        <DateCluster
+          key={group.date}
+          date={group.date}
+          memories={group.memories}
+          clusterPos={group.pos}
+          angle={group.angle}
+          onMemoryClick={setSelectedMemory}
+          flyTargetMemoryId={flyTargetMemoryId}
+          onTargetPosition={onTargetPosition}
+        />
+      ))}
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        enablePan={true}
+        enableZoom={true}
+        maxDistance={100}
+        minDistance={2}
+      />
+    </>
   );
 }
 
@@ -132,6 +230,55 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const createImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [flyState, setFlyState] = useState<{
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  } | null>(null);
+  const [flyPhase, setFlyPhase] = useState<"fly" | "explode" | "cardFade" | null>(null);
+  const [flyTargetMemoryId, setFlyTargetMemoryId] = useState<string | null>(null);
+  const [flyStart, setFlyStart] = useState<{ startX: number; startY: number } | null>(null);
+  const [flyEmotionColor, setFlyEmotionColor] = useState<string>("rgba(255,255,255,0.9)");
+  const [flyEmotionGlow, setFlyEmotionGlow] = useState<string>("rgba(255,255,255,0.6)");
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const flyPositionReportedRef = useRef(false);
+  const explosionParticles = useMemo(
+    () =>
+      Array.from({ length: 22 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 40 + Math.random() * 80;
+        return { dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist };
+      }),
+    [flyState]
+  );
+
+  useEffect(() => {
+    if (flyPhase !== "explode") return;
+    const t = setTimeout(() => setFlyPhase("cardFade"), 580);
+    return () => clearTimeout(t);
+  }, [flyPhase]);
+
+  // 若 Canvas 未及时报告新卡片位置，超时后回退到容器中心并开始飞行
+  useEffect(() => {
+    if (!flyTargetMemoryId || !flyStart) return;
+    const canvasRect = canvasContainerRef.current?.getBoundingClientRect();
+    const fallback = () => {
+      if (flyPositionReportedRef.current) return;
+      setFlyState({
+        ...flyStart,
+        endX: canvasRect ? canvasRect.left + canvasRect.width / 2 : window.innerWidth / 2,
+        endY: canvasRect ? canvasRect.top + canvasRect.height / 2 : window.innerHeight / 2,
+      });
+      setFlyPhase("fly");
+      setFlyTargetMemoryId(null);
+      setFlyStart(null);
+    };
+    const t = setTimeout(fallback, 800);
+    return () => clearTimeout(t);
+  }, [flyTargetMemoryId, flyStart]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<{
     type: "image" | "text";
     date: string;
@@ -256,9 +403,23 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
       const created = data?.memory;
       if (created) {
         setMemories((prev) => [...prev, created]);
+        const btnRect = createButtonRef.current?.getBoundingClientRect();
+        if (btnRect) {
+          flyPositionReportedRef.current = false;
+          const theme = getTheme(getEmotionFromText((created.title || "") + " " + (created.text || "")));
+          setFlyEmotionColor(theme.color);
+          setFlyEmotionGlow(theme.glowColor);
+          setFlyStart({ startX: btnRect.left + btnRect.width / 2, startY: btnRect.top + btnRect.height / 2 });
+          setFlyTargetMemoryId(created.id);
+        }
+        setIsCreating(false);
+        setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
+        setToastMessage("已化作情感气泡，可在首页情感场域查看");
+        setTimeout(() => setToastMessage(null), 3200);
+      } else {
+        setIsCreating(false);
+        setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
       }
-      setIsCreating(false);
-      setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
     } catch {
       alert("创建失败");
     }
@@ -315,32 +476,24 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
   return (
     <main className="w-full h-screen bg-[#050505] overflow-hidden relative">
       {/* 3D Space - 降低 z-index 确保 UI 在上 */}
-      <div className="absolute inset-0 z-0">
+      <div ref={canvasContainerRef} className="absolute inset-0 z-0">
         <Canvas dpr={[1, 2]} gl={{ antialias: true }} style={{ pointerEvents: 'auto' }}>
-          <PerspectiveCamera makeDefault position={[0, 0, 30]} fov={50} />
-          <CameraRig targetPos={targetClusterPos} onComplete={() => setTargetClusterPos(null)} controlsRef={controlsRef} />
-          <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-          <ambientLight intensity={1.5} />
-          <pointLight position={[10, 10, 10]} intensity={2} />
-          
-          {groupedMemories.map((group) => (
-            <DateCluster 
-              key={group.date} 
-              date={group.date} 
-              memories={group.memories} 
-              clusterPos={group.pos}
-              angle={group.angle}
-              onMemoryClick={setSelectedMemory}
-            />
-          ))}
-
-          <OrbitControls 
-            ref={controlsRef}
-            makeDefault
-            enablePan={true} 
-            enableZoom={true} 
-            maxDistance={100}
-            minDistance={2}
+          <TimelineScene
+            groupedMemories={groupedMemories}
+            setSelectedMemory={setSelectedMemory}
+            targetClusterPos={targetClusterPos}
+            setTargetClusterPos={setTargetClusterPos}
+            controlsRef={controlsRef}
+            flyTargetMemoryId={flyTargetMemoryId}
+            onTargetPosition={(x, y) => {
+              flyPositionReportedRef.current = true;
+              if (flyStart) {
+                setFlyState({ ...flyStart, endX: x, endY: y });
+                setFlyPhase("fly");
+                setFlyTargetMemoryId(null);
+                setFlyStart(null);
+              }
+            }}
           />
         </Canvas>
       </div>
@@ -648,7 +801,8 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
               className="bg-zinc-900 w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
             >
               <h2 className="text-xl font-serif py-4 px-6 text-white border-b border-white/10 flex-shrink-0">添加记忆</h2>
@@ -773,6 +927,7 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                   取消
                 </button>
                 <button
+                  ref={createButtonRef}
                   type="button"
                   onClick={handleCreateMemory}
                   className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
@@ -781,6 +936,148 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 创建后：从按钮飞向星空 + 拖尾 + 终点爆炸粒子 + 卡片淡出 */}
+      <AnimatePresence>
+        {flyState && flyPhase && (
+          <div className="fixed inset-0 z-[115] pointer-events-none">
+            {/* 阶段一：飞行 — 拖尾 + 主圆点（终点更大） */}
+            {flyPhase === "fly" && (
+              <>
+                {[0.06, 0.12, 0.18, 0.24, 0.3].map((delay, i) => {
+                  const size = 12 + i * 2;
+                  return (
+                    <motion.div
+                      key={`tail-${i}`}
+                      className="absolute rounded-full"
+                      style={{
+                        width: size,
+                        height: size,
+                        marginLeft: -size / 2,
+                        marginTop: -size / 2,
+                        backgroundColor: flyEmotionColor,
+                        boxShadow: `0 0 12px ${flyEmotionGlow}`,
+                      }}
+                      initial={{ left: flyState.startX, top: flyState.startY, scale: 0.3, opacity: 0.8 - i * 0.12 }}
+                      animate={{
+                        left: flyState.endX,
+                        top: flyState.endY,
+                        scale: 0.6 + i * 0.1,
+                        opacity: 0,
+                      }}
+                      transition={{
+                        duration: 1.15,
+                        delay,
+                        ease: [0.25, 0.1, 0.25, 1],
+                      }}
+                    />
+                  );
+                })}
+                <motion.div
+                  className="absolute rounded-full"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    marginLeft: -18,
+                    marginTop: -18,
+                    backgroundColor: flyEmotionColor,
+                    boxShadow: `0 0 32px ${flyEmotionGlow}`,
+                  }}
+                  initial={{ left: flyState.startX, top: flyState.startY, scale: 0.4, opacity: 1 }}
+                  animate={{
+                    left: flyState.endX,
+                    top: flyState.endY,
+                    scale: 1.6,
+                    opacity: 1,
+                  }}
+                  transition={{ duration: 1.2, ease: [0.25, 0.1, 0.25, 1] }}
+                  onAnimationComplete={() => setFlyPhase("explode")}
+                />
+              </>
+            )}
+
+            {/* 阶段二：到达终点 — 爆炸粒子 */}
+            {flyPhase === "explode" && (
+              <>
+                {explosionParticles.map((p, i) => (
+                  <motion.div
+                    key={`exp-${i}`}
+                    className="absolute rounded-full"
+                    style={{
+                      width: 8,
+                      height: 8,
+                      marginLeft: -4,
+                      marginTop: -4,
+                      left: flyState.endX,
+                      top: flyState.endY,
+                      backgroundColor: flyEmotionColor,
+                      boxShadow: `0 0 8px ${flyEmotionGlow}`,
+                    }}
+                    initial={{ x: 0, y: 0, scale: 1, opacity: 0.95 }}
+                    animate={{
+                      x: p.dx,
+                      y: p.dy,
+                      scale: 0,
+                      opacity: 0,
+                    }}
+                    transition={{
+                      duration: 0.52,
+                      delay: i * 0.012,
+                      ease: [0.2, 0.8, 0.2, 1],
+                    }}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* 阶段三：粒子消失后 — 卡片形状淡出 */}
+            {flyPhase === "cardFade" && (
+              <motion.div
+                className="absolute rounded-2xl backdrop-blur-sm border border-white/30"
+                style={{
+                  width: 120,
+                  height: 80,
+                  left: flyState.endX,
+                  top: flyState.endY,
+                  marginLeft: -60,
+                  marginTop: -40,
+                  backgroundColor: flyEmotionColor,
+                  boxShadow: `0 0 40px ${flyEmotionGlow}`,
+                }}
+                initial={{ scale: 0.8, opacity: 0.7 }}
+                animate={{ scale: 1.2, opacity: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                onAnimationComplete={() => {
+                  setFlyState(null);
+                  setFlyPhase(null);
+                  setFlyEmotionColor("rgba(255,255,255,0.9)");
+                  setFlyEmotionGlow("rgba(255,255,255,0.6)");
+                }}
+              />
+            )}
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 保存成功：已化作情感气泡 提示 */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[120] px-6 py-3 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/20 text-white text-sm shadow-xl"
+          >
+            {toastMessage}
+            <a
+              href="/#emotion"
+              className="ml-2 text-morandi-sage hover:underline"
+            >
+              前往情感场域 →
+            </a>
           </motion.div>
         )}
       </AnimatePresence>

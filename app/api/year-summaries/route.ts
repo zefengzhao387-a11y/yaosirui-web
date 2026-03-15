@@ -70,12 +70,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "标题不能为空" }, { status: 400 });
   }
 
-  // 本地演示账号无法写入数据库，给出明确提示
+  // 本地演示账号：不写库，返回假数据供前端展示；公网不受影响
   if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID) {
-    return NextResponse.json(
-      { error: "本地演示账号仅可浏览，无法创建或修改。请用真实账号登录或在公网注册后使用。" },
-      { status: 400 }
-    );
+    return NextResponse.json({
+      year: {
+        year,
+        title,
+        summary,
+        highlights: [highlight1, highlight2].filter(Boolean),
+      },
+    }, { status: 201 });
   }
 
   const saved = await prisma.yearSummary.upsert({

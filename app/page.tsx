@@ -41,7 +41,7 @@ export default function Home() {
         </motion.div>
 
         {/* Emotion Bubbles Showcase */}
-        <section className="py-24 px-4 max-w-5xl mx-auto text-center">
+        <section id="emotion" className="py-24 px-4 max-w-5xl mx-auto text-center scroll-mt-20">
           <div className="mb-12">
             <h2 className="text-4xl md:text-5xl font-serif text-white mb-4">
               情感场域

@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
+const DEMO_USER_ID = "demo-local";
+
 function getUserIdOrThrow(session: any) {
   const userId = session?.user?.id;
   if (!userId || typeof userId !== "string") throw new Error("UNAUTHORIZED");
@@ -34,9 +36,35 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
+  // 本地演示账号：不连库，直接返回空列表；公网不受影响
+  if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID) {
+    return NextResponse.json({ memories: [] });
+  }
+
   const url = new URL(request.url);
   const year = url.searchParams.get("year") ?? "";
   const monthDay = url.searchParams.get("date");
+  const all = url.searchParams.get("all") === "1";
+
+  // 情感气泡用：拉取全部记忆（不限年份）
+  if (all) {
+    const list = await prisma.memory.findMany({
+      where: { userId },
+      orderBy: { date: "desc" },
+      take: 100,
+    });
+    return NextResponse.json({
+      memories: list.map((m) => ({
+        id: m.id,
+        type: m.imageUrl ? "image" : "text",
+        url: m.imageUrl ?? "",
+        title: m.title,
+        date: toMonthDay(m.date),
+        location: m.location ?? "",
+        text: m.content ?? "",
+      })),
+    });
+  }
 
   if (!/^\d{4}$/.test(year)) {
     return NextResponse.json({ error: "缺少 year" }, { status: 400 });
@@ -114,6 +142,25 @@ export async function POST(request: Request) {
   const dt = parseMonthDay(year, date);
   if (!dt) {
     return NextResponse.json({ error: "date 格式应为 MM-DD" }, { status: 400 });
+  }
+
+  // 本地演示账号：不写库，返回假数据供前端展示；公网不受影响
+  if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID) {
+    const fakeId = `demo-mem-${Date.now()}`;
+    return NextResponse.json(
+      {
+        memory: {
+          id: fakeId,
+          type: url ? "image" : "text",
+          url: url || "",
+          title,
+          date,
+          location: location ?? "",
+          text,
+        },
+      },
+      { status: 201 }
+    );
   }
 
   const created = await prisma.memory.create({

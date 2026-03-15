@@ -375,14 +375,31 @@ export default function Timeline3D() {
       }),
     })
       .then(async (res) => {
-        const data = await res.json().catch(() => null);
+        const data = (await res.json().catch(() => null)) as {
+          year?: { year: string; title: string; summary: string; highlights: string[] };
+          error?: string;
+        };
         if (!res.ok) {
           alert(data?.error || "创建失败");
           return;
         }
         setIsCreating(false);
         setCreateForm({ year: "", title: "", summary: "", highlights: [] });
-        refreshYears();
+        if (data?.year) {
+          setNodes((prev) =>
+            buildNodes([
+              ...prev.map((n) => ({
+                year: n.year,
+                title: n.title,
+                summary: n.summary,
+                highlights: n.highlights,
+              })),
+              data.year!,
+            ])
+          );
+        } else {
+          refreshYears();
+        }
       })
       .catch(() => alert("创建失败"));
   };
