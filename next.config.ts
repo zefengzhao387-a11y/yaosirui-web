@@ -1,8 +1,10 @@
 const nextConfig = {
   reactStrictMode: true,
-  // 确保 API 路由能读到 .env.local 中的 Gemini Key（本地 dev 有时读不到）
+  // 确保 API 路由能读到 .env.local 中的 AI Key（诗意引言用 OpenAI 兼容 API）
   env: {
-    GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? "",
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? "",
+    AI_POETIC_MODEL: process.env.AI_POETIC_MODEL ?? "",
   },
 };
 

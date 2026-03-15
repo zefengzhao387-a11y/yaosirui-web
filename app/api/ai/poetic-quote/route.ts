@@ -1,16 +1,16 @@
 import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
 import path from "path";
 import { config as loadEnv } from "dotenv";
 
-// 本地 dev 下若 process.env 未注入，则直接从 .env.local 读取
-function getApiKey(): string {
-  let raw = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+// 使用 OpenAI 兼容 API（国内可用 DeepSeek / Moonshot 等），不再依赖 Gemini
+function getEnv(name: string): string {
+  let raw = process.env[name];
   if (typeof raw === "string" && raw.trim()) return raw.trim();
   try {
     loadEnv({ path: path.join(process.cwd(), ".env.local") });
-    raw = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    raw = process.env[name];
     if (typeof raw === "string" && raw.trim()) return raw.trim();
   } catch {
     // ignore
@@ -19,18 +19,20 @@ function getApiKey(): string {
 }
 
 export async function POST(request: Request) {
-  const apiKey = getApiKey();
+  const apiKey = getEnv("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       {
-        error: "未配置 GOOGLE_GENERATIVE_AI_API_KEY",
-        hint: "请在项目根目录 .env.local 中添加该变量并重启 npm run dev",
+        error: "未配置 OPENAI_API_KEY",
+        hint: "在 .env.local 中添加 OPENAI_API_KEY。可用 DeepSeek / Moonshot / OpenAI 等，见本地调试.md",
       },
       { status: 503 }
     );
   }
 
-  const google = createGoogleGenerativeAI({ apiKey });
+  const baseURL = getEnv("OPENAI_BASE_URL") || undefined;
+  const model = getEnv("AI_POETIC_MODEL") || (baseURL?.includes("deepseek") ? "deepseek-chat" : "gpt-4o-mini");
+  const openai = createOpenAI({ apiKey, baseURL: baseURL || undefined });
 
   let body: { colors?: string[]; tags?: string[]; mood?: string };
   try {
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
 
   try {
     const { text } = await generateText({
-      model: google("gemini-1.5-flash"),
+      model: openai(model as "gpt-4o-mini"),
       prompt,
     });
     const quote = (text || "").trim().replace(/^[""]|[""]$/g, "");
