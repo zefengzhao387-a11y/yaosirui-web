@@ -8,6 +8,8 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PerspectiveCamera, Stars, Html, Float, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { getEmotionFromText, getTheme } from "@/lib/emotion";
+import { analyzeImage, type ImageAnalysisResult } from "@/lib/image-analysis";
+import { recommendBGM } from "@/lib/bgm-mapping";
 
 const INITIAL_MEMORIES = [
   { id: 1, type: "image", url: "/photo1.jpg", title: "春日漫步", date: "04-12", location: "中央公园", text: "那是我们第一次一起看樱花。" },
@@ -294,6 +296,11 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
     text: "",
     url: "",
   });
+  const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysisResult | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [poeticQuote, setPoeticQuote] = useState<string | null>(null);
+  const [bgmRecommendation, setBgmRecommendation] = useState<ReturnType<typeof recommendBGM> | null>(null);
 
   const fileToDataUrl = (file: File) => {
     return new Promise<string>((resolve, reject) => {
@@ -365,9 +372,75 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
 
   const handleCreateImageFileChange = (file: File | null) => {
     if (!file) return;
+    setImageAnalysis(null);
+    setPoeticQuote(null);
+    setBgmRecommendation(null);
     fileToDataUrl(file)
       .then((url) => setCreateForm((p) => ({ ...p, url })))
       .catch(() => {});
+  };
+
+  const handleAnalyzeImage = async () => {
+    const url = createForm.url?.trim();
+    if (!url || createForm.type !== "image") return;
+    setAnalysisLoading(true);
+    setImageAnalysis(null);
+    setBgmRecommendation(null);
+    try {
+      const result = await analyzeImage(url);
+      setImageAnalysis(result);
+      setBgmRecommendation(recommendBGM(result.colorMood, result.tags));
+    } catch {
+      setImageAnalysis(null);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  const handleGeneratePoeticQuote = async () => {
+    const colors = imageAnalysis?.dominantColorHex ? [imageAnalysis.dominantColorHex] : [];
+    const tags = imageAnalysis?.tags ?? [];
+    if (colors.length === 0 && tags.length === 0) {
+      const url = createForm.url?.trim();
+      if (url) {
+        setQuoteLoading(true);
+        try {
+          const result = await analyzeImage(url);
+          setImageAnalysis(result);
+          setBgmRecommendation(recommendBGM(result.colorMood, result.tags));
+          const res = await fetch("/api/ai/poetic-quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              colors: [result.dominantColorHex],
+              tags: result.tags,
+              mood: "怀旧",
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.quote) setPoeticQuote(data.quote);
+        } finally {
+          setQuoteLoading(false);
+        }
+      }
+      return;
+    }
+    setQuoteLoading(true);
+    try {
+      const res = await fetch("/api/ai/poetic-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          colors: colors.length ? [imageAnalysis!.dominantColorHex] : [],
+          tags,
+          mood: "怀旧",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.quote) setPoeticQuote(data.quote);
+    } finally {
+      setQuoteLoading(false);
+    }
   };
 
   const handleCreateMemory = async () => {
@@ -414,11 +487,17 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
         }
         setIsCreating(false);
         setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
+        setImageAnalysis(null);
+        setPoeticQuote(null);
+        setBgmRecommendation(null);
         setToastMessage("已化作情感气泡，可在首页情感场域查看");
         setTimeout(() => setToastMessage(null), 3200);
       } else {
         setIsCreating(false);
         setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
+        setImageAnalysis(null);
+        setPoeticQuote(null);
+        setBgmRecommendation(null);
       }
     } catch {
       alert("创建失败");
@@ -796,7 +875,14 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 backdrop-blur-2xl transition-colors duration-700"
+            style={
+              imageAnalysis?.dominantColorHex
+                ? {
+                    background: `linear-gradient(135deg, ${imageAnalysis.dominantColorHex}22 0%, transparent 45%), rgba(0,0,0,0.88)`,
+                  }
+                : undefined
+            }
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
@@ -821,7 +907,12 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCreateForm((p) => ({ ...p, type: "text", url: "" }))}
+                    onClick={() => {
+                      setCreateForm((p) => ({ ...p, type: "text", url: "" }));
+                      setImageAnalysis(null);
+                      setPoeticQuote(null);
+                      setBgmRecommendation(null);
+                    }}
                     className={`py-3 rounded-xl font-bold transition-all ${
                       createForm.type === "text"
                         ? "bg-white text-black"
@@ -861,7 +952,12 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                       </button>
                       <button
                         type="button"
-                        onClick={() => setCreateForm((p) => ({ ...p, url: "" }))}
+                        onClick={() => {
+                          setCreateForm((p) => ({ ...p, url: "" }));
+                          setImageAnalysis(null);
+                          setPoeticQuote(null);
+                          setBgmRecommendation(null);
+                        }}
                         className="px-5 py-3 border border-white/10 rounded-xl font-medium text-white/60 hover:bg-white/5 transition-all"
                       >
                         清空
@@ -874,6 +970,62 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                       onChange={(e) => setCreateForm((p) => ({ ...p, url: e.target.value }))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
                     />
+                    {createForm.url && (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={handleAnalyzeImage}
+                          disabled={analysisLoading}
+                          className="w-full py-2.5 rounded-xl border border-morandi-sage/50 text-morandi-sage font-medium hover:bg-morandi-sage/10 transition-all disabled:opacity-50"
+                        >
+                          {analysisLoading ? "分析中…" : "分析照片（颜色 + 场景）"}
+                        </button>
+                        {imageAnalysis && (
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="text-white/50">主色</span>
+                            <span
+                              className="w-6 h-6 rounded-full border border-white/20 shadow-inner"
+                              style={{ backgroundColor: imageAnalysis.dominantColorHex }}
+                              title={imageAnalysis.dominantColorHex}
+                            />
+                            <span className="text-white/50">标签</span>
+                            {imageAnalysis.tags.map((t) => (
+                              <span key={t} className="px-2 py-0.5 rounded-full bg-white/10 text-white/80">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleGeneratePoeticQuote}
+                          disabled={quoteLoading}
+                          className="w-full py-2.5 rounded-xl bg-morandi-sage/20 border border-morandi-sage/40 text-morandi-sage font-medium hover:bg-morandi-sage/30 transition-all disabled:opacity-50"
+                        >
+                          {quoteLoading ? "生成中…" : "生成诗意引言"}
+                        </button>
+                        {poeticQuote && (
+                          <div className="space-y-1">
+                            <p className="text-sm text-white/90 italic border-l-2 border-morandi-sage/50 pl-3 py-1">
+                              "{poeticQuote}"
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setCreateForm((p) => ({ ...p, text: p.text ? `${p.text}\n${poeticQuote}` : poeticQuote }))}
+                              className="text-xs text-morandi-sage hover:underline"
+                            >
+                              填入记忆故事
+                            </button>
+                          </div>
+                        )}
+                        {bgmRecommendation && (
+                          <div className="flex items-center gap-2 text-sm text-white/60">
+                            <Music className="w-4 h-4 flex-shrink-0" />
+                            <span>推荐：{bgmRecommendation.label} — {bgmRecommendation.description}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
