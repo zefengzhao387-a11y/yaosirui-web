@@ -168,6 +168,22 @@ function CameraFlyTo({
   return null;
 }
 
+/** 缓慢旋转的星空（比主页更慢） */
+function SlowRotatingStars() {
+  const groupRef = React.useRef<THREE.Group>(null);
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.x -= delta / 50;
+      groupRef.current.rotation.y -= delta / 70;
+    }
+  });
+  return (
+    <group ref={groupRef}>
+      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+    </group>
+  );
+}
+
 function TimelineScene({
   nodes,
   onNodeClick,
@@ -184,7 +200,7 @@ function TimelineScene({
   return (
     <>
       <color attach="background" args={["#050505"]} />
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      <SlowRotatingStars />
       <ambientLight intensity={1} />
       <pointLight position={[10, 10, 10]} intensity={5} />
       
@@ -573,11 +589,11 @@ export default function Timeline3D() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+            className="fixed inset-0 z-[300] flex items-center justify-center py-8 px-4 bg-black/60 backdrop-blur-md"
           >
-            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-8 shadow-2xl border border-white/20">
-              <h2 className="text-2xl font-serif mb-6 text-morandi-midnightBlue dark:text-morandi-cream">编辑 {selectedYear ?? ""} 年度记忆</h2>
-              <div className="space-y-4">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg max-h-[75vh] rounded-3xl shadow-2xl border border-white/20 flex flex-col overflow-hidden">
+              <h2 className="text-xl font-serif py-4 px-6 flex-shrink-0 border-b border-morandi-sage/10 text-morandi-midnightBlue dark:text-morandi-cream">编辑 {selectedYear ?? ""} 年度记忆</h2>
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-morandi-sage mb-1">记忆标题</label>
                   <input 
@@ -652,7 +668,9 @@ export default function Timeline3D() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-4 mt-8">
+              </div>
+              <div className="flex-shrink-0 p-6 border-t border-morandi-sage/10">
+                <div className="flex gap-4">
                   <button 
                     onClick={() => setIsEditing(false)}
                     className="flex-1 py-3 border border-morandi-sage/30 rounded-xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all"
@@ -678,11 +696,11 @@ export default function Timeline3D() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed inset-0 z-[320] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+            className="fixed inset-0 z-[320] flex items-center justify-center py-8 px-4 bg-black/60 backdrop-blur-md"
           >
-            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-8 shadow-2xl border border-white/20">
-              <h2 className="text-2xl font-serif mb-6 text-morandi-midnightBlue dark:text-morandi-cream">创建年份星团</h2>
-              <div className="space-y-4">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg max-h-[75vh] rounded-3xl shadow-2xl border border-white/20 flex flex-col overflow-hidden">
+              <h2 className="text-xl font-serif py-4 px-6 flex-shrink-0 border-b border-morandi-sage/10 text-morandi-midnightBlue dark:text-morandi-cream">创建年份星团</h2>
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-morandi-sage mb-1">年份</label>
                   <input
@@ -767,7 +785,9 @@ export default function Timeline3D() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-4 mt-8">
+              </div>
+              <div className="flex-shrink-0 p-6 border-t border-morandi-sage/10">
+                <div className="flex gap-4">
                   <button
                     type="button"
                     onClick={() => setIsCreating(false)}

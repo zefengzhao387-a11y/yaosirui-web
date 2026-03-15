@@ -2,7 +2,7 @@
 
 import React, { use, useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, MapPin, Music, X, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Music, X, ChevronRight, Loader2, Lock, Unlock, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PerspectiveCamera, Stars, Html, Float, OrbitControls } from "@react-three/drei";
@@ -171,6 +171,22 @@ function DateCluster({
   );
 }
 
+/** 缓慢旋转的星空（比主页更慢） */
+function SlowRotatingStars() {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.x -= delta / 50;
+      groupRef.current.rotation.y -= delta / 70;
+    }
+  });
+  return (
+    <group ref={groupRef}>
+      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+    </group>
+  );
+}
+
 // Canvas 内场景：接收 flyTargetMemoryId / onTargetPosition，传给 DateCluster 以报告新卡片屏幕坐标
 function TimelineScene({
   groupedMemories,
@@ -193,7 +209,7 @@ function TimelineScene({
     <>
       <PerspectiveCamera makeDefault position={[0, 0, 30]} fov={50} />
       <CameraRig targetPos={targetClusterPos} onComplete={() => setTargetClusterPos(null)} controlsRef={controlsRef} />
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      <SlowRotatingStars />
       <ambientLight intensity={1.5} />
       <pointLight position={[10, 10, 10]} intensity={2} />
       {groupedMemories.map((group) => (
@@ -246,6 +262,7 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const flyPositionReportedRef = useRef(false);
+  const createImageFileRef = useRef<File | null>(null);
   const explosionParticles = useMemo(
     () =>
       Array.from({ length: 22 }, () => {
@@ -288,6 +305,8 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
     location: string;
     text: string;
     url: string;
+    isPrivate?: boolean;
+    unlockAt?: string;
   }>({
     type: "image",
     date: "",
@@ -295,12 +314,40 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
     location: "",
     text: "",
     url: "",
+    isPrivate: false,
+    unlockAt: "",
   });
   const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysisResult | null>(null);
+  const [editableTags, setEditableTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState("");
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [poeticQuote, setPoeticQuote] = useState<string | null>(null);
+  const [quoteDisplayLength, setQuoteDisplayLength] = useState(0);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [bgmRecommendation, setBgmRecommendation] = useState<ReturnType<typeof recommendBGM> | null>(null);
+
+  // 诗意引言打字机效果（须在 poeticQuote 声明之后）
+  useEffect(() => {
+    if (!poeticQuote) {
+      setQuoteDisplayLength(0);
+      return;
+    }
+    setQuoteDisplayLength(0);
+    const len = poeticQuote.length;
+    const step = 1;
+    const interval = Math.max(30, 2000 / len);
+    const id = setInterval(() => {
+      setQuoteDisplayLength((n) => {
+        if (n >= len) {
+          clearInterval(id);
+          return len;
+        }
+        return Math.min(n + step, len);
+      });
+    }, interval);
+    return () => clearInterval(id);
+  }, [poeticQuote]);
 
   const fileToDataUrl = (file: File) => {
     return new Promise<string>((resolve, reject) => {
@@ -372,12 +419,50 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
 
   const handleCreateImageFileChange = (file: File | null) => {
     if (!file) return;
+    createImageFileRef.current = file;
     setImageAnalysis(null);
+    setEditableTags([]);
     setPoeticQuote(null);
     setBgmRecommendation(null);
     fileToDataUrl(file)
       .then((url) => setCreateForm((p) => ({ ...p, url })))
       .catch(() => {});
+  };
+
+  const handleExifFromPhoto = async () => {
+    const file = createImageFileRef.current;
+    if (!file) {
+      setToastMessage("请先选择一张照片");
+      setTimeout(() => setToastMessage(null), 2000);
+      return;
+    }
+    try {
+      const exifr = (await import("exifr")).default;
+      const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate", "GPSLatitude", "GPSLongitude"] });
+      if (exif?.DateTimeOriginal) {
+        const d = new Date(exif.DateTimeOriginal);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        setCreateForm((p) => ({ ...p, date: `${mm}-${dd}` }));
+      }
+      if (exif?.CreateDate && !exif?.DateTimeOriginal) {
+        const d = new Date(exif.CreateDate);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        setCreateForm((p) => ({ ...p, date: `${mm}-${dd}` }));
+      }
+      if (exif?.GPSLatitude != null && exif?.GPSLongitude != null) {
+        setToastMessage("已填入拍摄日期；地点需根据经纬度解析，暂仅支持日期");
+      } else if (exif?.DateTimeOriginal || exif?.CreateDate) {
+        setToastMessage("已从照片 EXIF 填入拍摄日期");
+      } else {
+        setToastMessage("该照片无 EXIF 日期信息");
+      }
+      setTimeout(() => setToastMessage(null), 2500);
+    } catch {
+      setToastMessage("读取 EXIF 失败或照片无元数据");
+      setTimeout(() => setToastMessage(null), 2000);
+    }
   };
 
   const handleAnalyzeImage = async () => {
@@ -389,17 +474,20 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
     try {
       const result = await analyzeImage(url);
       setImageAnalysis(result);
+      setEditableTags([...result.tags]);
       setBgmRecommendation(recommendBGM(result.colorMood, result.tags));
     } catch {
       setImageAnalysis(null);
+      setEditableTags([]);
     } finally {
       setAnalysisLoading(false);
     }
   };
 
   const handleGeneratePoeticQuote = async () => {
+    setQuoteError(null);
     const colors = imageAnalysis?.dominantColorHex ? [imageAnalysis.dominantColorHex] : [];
-    const tags = imageAnalysis?.tags ?? [];
+    const tags = editableTags.length > 0 ? editableTags : (imageAnalysis?.tags ?? []);
     if (colors.length === 0 && tags.length === 0) {
       const url = createForm.url?.trim();
       if (url) {
@@ -407,8 +495,9 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
         try {
           const result = await analyzeImage(url);
           setImageAnalysis(result);
+          setEditableTags([...result.tags]);
           setBgmRecommendation(recommendBGM(result.colorMood, result.tags));
-          const res = await fetch("/api/ai/poetic-quote", {
+          const res = await fetch("/api/poetic-quote", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -418,7 +507,13 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
             }),
           });
           const data = await res.json().catch(() => ({}));
-          if (data.quote) setPoeticQuote(data.quote);
+          if (data.quote) {
+            setPoeticQuote(data.quote);
+          } else {
+            setQuoteError(data.error || data.detail || (res.status === 503 ? "未配置 OPENAI_API_KEY，见 .env.local" : "生成失败"));
+          }
+        } catch {
+          setQuoteError("网络或请求异常，请重试");
         } finally {
           setQuoteLoading(false);
         }
@@ -427,17 +522,23 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
     }
     setQuoteLoading(true);
     try {
-      const res = await fetch("/api/ai/poetic-quote", {
+      const res = await fetch("/api/poetic-quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           colors: colors.length ? [imageAnalysis!.dominantColorHex] : [],
-          tags,
+          tags: tags.length ? tags : imageAnalysis?.tags ?? [],
           mood: "怀旧",
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.quote) setPoeticQuote(data.quote);
+      if (data.quote) {
+        setPoeticQuote(data.quote);
+      } else {
+        setQuoteError(data.error || data.detail || (res.status === 503 ? "未配置 OPENAI_API_KEY，见 .env.local" : "生成失败"));
+      }
+    } catch {
+      setQuoteError("网络或请求异常，请重试");
     } finally {
       setQuoteLoading(false);
     }
@@ -486,16 +587,18 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
           setFlyTargetMemoryId(created.id);
         }
         setIsCreating(false);
-        setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
+        setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "", isPrivate: false, unlockAt: "" });
         setImageAnalysis(null);
+        setEditableTags([]);
         setPoeticQuote(null);
         setBgmRecommendation(null);
         setToastMessage("已化作情感气泡，可在首页情感场域查看");
         setTimeout(() => setToastMessage(null), 3200);
       } else {
         setIsCreating(false);
-        setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "" });
+        setCreateForm({ type: "image", date: "", title: "", location: "", text: "", url: "", isPrivate: false, unlockAt: "" });
         setImageAnalysis(null);
+        setEditableTags([]);
         setPoeticQuote(null);
         setBgmRecommendation(null);
       }
@@ -875,21 +978,26 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 backdrop-blur-2xl transition-colors duration-700"
-            style={
-              imageAnalysis?.dominantColorHex
-                ? {
-                    background: `linear-gradient(135deg, ${imageAnalysis.dominantColorHex}22 0%, transparent 45%), rgba(0,0,0,0.88)`,
-                  }
-                : undefined
-            }
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 backdrop-blur-2xl"
+            style={{
+              background: imageAnalysis?.dominantColorHex
+                ? `linear-gradient(135deg, ${imageAnalysis.dominantColorHex}25 0%, transparent 55%), rgba(0,0,0,0.32)`
+                : "rgba(0,0,0,0.38)",
+              transition: "background 0.7s ease",
+            }}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="bg-zinc-900 w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
+              className="w-full max-w-xl max-h-[85vh] rounded-3xl flex flex-col overflow-hidden border border-white/20 shadow-2xl bg-black/25 backdrop-blur-xl"
+              style={{
+                boxShadow: imageAnalysis?.dominantColorHex
+                  ? `0 0 80px ${imageAnalysis.dominantColorHex}55, 0 0 120px ${imageAnalysis.dominantColorHex}35, 0 25px 50px -12px rgba(0,0,0,0.4)`
+                  : "0 25px 50px -12px rgba(0,0,0,0.4)",
+                transition: "box-shadow 0.7s ease",
+              }}
             >
               <h2 className="text-xl font-serif py-4 px-6 text-white border-b border-white/10 flex-shrink-0">添加记忆</h2>
               <div className="overflow-y-auto flex-1 min-h-0 p-6 space-y-4">
@@ -911,6 +1019,7 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                       setCreateForm((p) => ({ ...p, type: "text", url: "" }));
                       setImageAnalysis(null);
                       setPoeticQuote(null);
+                      setQuoteError(null);
                       setBgmRecommendation(null);
                     }}
                     className={`py-3 rounded-xl font-bold transition-all ${
@@ -926,7 +1035,15 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                 {createForm.type === "image" && (
                   <div className="space-y-3">
                     <label className="block text-xs font-bold text-morandi-sage uppercase tracking-widest mb-2">照片</label>
-                    <div className="aspect-[3/4] max-h-44 w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+                    <div
+                      className="aspect-[3/4] max-h-44 w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5"
+                      style={{
+                        boxShadow: imageAnalysis?.dominantColorHex
+                          ? `inset 0 0 0 2px ${imageAnalysis.dominantColorHex}66, 0 0 36px ${imageAnalysis.dominantColorHex}70, 0 0 60px ${imageAnalysis.dominantColorHex}40`
+                          : "none",
+                        transition: "box-shadow 0.7s ease",
+                      }}
+                    >
                       {createForm.url ? (
                         <img src={createForm.url} alt="preview" className="w-full h-full object-cover" />
                       ) : (
@@ -953,9 +1070,12 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                       <button
                         type="button"
                         onClick={() => {
+                          createImageFileRef.current = null;
                           setCreateForm((p) => ({ ...p, url: "" }));
                           setImageAnalysis(null);
+                          setEditableTags([]);
                           setPoeticQuote(null);
+                          setQuoteError(null);
                           setBgmRecommendation(null);
                         }}
                         className="px-5 py-3 border border-white/10 rounded-xl font-medium text-white/60 hover:bg-white/5 transition-all"
@@ -976,25 +1096,97 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                           type="button"
                           onClick={handleAnalyzeImage}
                           disabled={analysisLoading}
-                          className="w-full py-2.5 rounded-xl border border-morandi-sage/50 text-morandi-sage font-medium hover:bg-morandi-sage/10 transition-all disabled:opacity-50"
+                          className="w-full py-2.5 rounded-xl border border-morandi-sage/50 text-morandi-sage font-medium hover:bg-morandi-sage/10 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                          {analysisLoading ? "分析中…" : "分析照片（颜色 + 场景）"}
+                          {analysisLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              分析中…
+                            </>
+                          ) : (
+                            "分析照片（颜色 + 场景）"
+                          )}
                         </button>
                         {imageAnalysis && (
-                          <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="text-white/50">主色</span>
-                            <span
-                              className="w-6 h-6 rounded-full border border-white/20 shadow-inner"
-                              style={{ backgroundColor: imageAnalysis.dominantColorHex }}
-                              title={imageAnalysis.dominantColorHex}
-                            />
-                            <span className="text-white/50">标签</span>
-                            {imageAnalysis.tags.map((t) => (
-                              <span key={t} className="px-2 py-0.5 rounded-full bg-white/10 text-white/80">
-                                {t}
-                              </span>
-                            ))}
-                          </div>
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="space-y-2"
+                          >
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                              <span className="text-white/50">主色</span>
+                              <span
+                                className="w-7 h-7 rounded-full border border-white/20 flex-shrink-0"
+                                style={{
+                                  backgroundColor: imageAnalysis.dominantColorHex,
+                                  boxShadow: `0 0 16px ${imageAnalysis.dominantColorHex}, 0 0 32px ${imageAnalysis.dominantColorHex}99`,
+                                  transition: "background-color 0.6s ease, box-shadow 0.6s ease",
+                                }}
+                                title={imageAnalysis.dominantColorHex}
+                              />
+                              <span className="text-white/50">标签</span>
+                              {editableTags.map((t) => (
+                                <span
+                                  key={t}
+                                  className="px-2 py-0.5 rounded-full bg-white/10 text-white/80 flex items-center gap-1"
+                                >
+                                  {t}
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditableTags((prev) => prev.filter((x) => x !== t))}
+                                    className="hover:text-red-400 rounded-full p-0.5"
+                                    aria-label="删除"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                              <span className="text-white/40 text-xs">+</span>
+                              <input
+                                type="text"
+                                value={newTagInput}
+                                onChange={(e) => setNewTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && newTagInput.trim()) {
+                                    setEditableTags((prev) => [...prev, newTagInput.trim()]);
+                                    setNewTagInput("");
+                                  }
+                                }}
+                                placeholder="添加标签"
+                                className="w-20 py-0.5 px-2 rounded-full bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:ring-1 focus:ring-morandi-sage/50"
+                              />
+                              {newTagInput.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditableTags((prev) => [...prev, newTagInput.trim()]);
+                                    setNewTagInput("");
+                                  }}
+                                  className="text-morandi-sage text-xs hover:underline"
+                                >
+                                  添加
+                                </button>
+                              )}
+                            </div>
+                            {(() => {
+                              const textForEmotion = createForm.text || poeticQuote || "";
+                              const emotion = getEmotionFromText(textForEmotion || createForm.title);
+                              const theme = getTheme(emotion);
+                              return (
+                                <div className="flex items-center gap-2 text-sm text-white/70">
+                                  <Sparkles className="w-4 h-4 text-amber-400/80" />
+                                  <span>情感基调：</span>
+                                  <span
+                                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                                    style={{ backgroundColor: theme.color, color: "rgba(255,255,255,0.95)" }}
+                                  >
+                                    {theme.label}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </motion.div>
                         )}
                         <button
                           type="button"
@@ -1004,10 +1196,19 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                         >
                           {quoteLoading ? "生成中…" : "生成诗意引言"}
                         </button>
+                        {quoteError && (
+                          <p className="text-sm text-red-400/90">
+                            {quoteError}
+                          </p>
+                        )}
                         {poeticQuote && (
                           <div className="space-y-1">
-                            <p className="text-sm text-white/90 italic border-l-2 border-morandi-sage/50 pl-3 py-1">
-                              "{poeticQuote}"
+                            <p className="text-sm text-white/90 italic border-l-2 border-morandi-sage/50 pl-3 py-1 min-h-[2rem]">
+                              "{poeticQuote.slice(0, quoteDisplayLength)}
+                              {quoteDisplayLength < poeticQuote.length && (
+                                <span className="inline-block w-0.5 h-4 bg-morandi-sage/80 animate-pulse ml-0.5 align-middle" />
+                              )}
+                              "
                             </p>
                             <button
                               type="button"
@@ -1022,6 +1223,16 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                           <div className="flex items-center gap-2 text-sm text-white/60">
                             <Music className="w-4 h-4 flex-shrink-0" />
                             <span>推荐：{bgmRecommendation.label} — {bgmRecommendation.description}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setToastMessage("试听功能即将上线，敬请期待");
+                                setTimeout(() => setToastMessage(null), 2500);
+                              }}
+                              className="text-morandi-sage/80 hover:text-morandi-sage text-xs px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
+                            >
+                              试听
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1049,6 +1260,18 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                     />
                   </div>
                 </div>
+                {createForm.type === "image" && createForm.url && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleExifFromPhoto}
+                      className="text-xs text-morandi-sage hover:underline flex items-center gap-1"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      从照片获取日期
+                    </button>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-morandi-sage uppercase tracking-widest mb-2">标题</label>
@@ -1069,6 +1292,29 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
                   />
                 </div>
+                {/* 私密性与未来信件 */}
+                <div className="space-y-3 pt-2 border-t border-white/10">
+                  <label className="flex items-center gap-3 cursor-pointer text-sm text-white/80">
+                    <input
+                      type="checkbox"
+                      checked={!!createForm.isPrivate}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, isPrivate: e.target.checked }))}
+                      className="rounded border-white/20 bg-white/5"
+                    />
+                    <Lock className="w-4 h-4 text-white/50" />
+                    存入密闭阁楼（仅自己可见）
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-white/50" />
+                    <span className="text-sm text-white/60">设定开启日期（未来信件）：</span>
+                    <input
+                      type="date"
+                      value={createForm.unlockAt || ""}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, unlockAt: e.target.value || "" }))}
+                      className="flex-1 py-2 px-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="flex gap-4 p-6 border-t border-white/10 flex-shrink-0">
                 <button
@@ -1082,7 +1328,14 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                   ref={createButtonRef}
                   type="button"
                   onClick={handleCreateMemory}
-                  className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
+                  className="flex-1 py-3 rounded-xl font-bold text-black"
+                  style={{
+                    backgroundColor: "#fff",
+                    boxShadow: imageAnalysis?.dominantColorHex
+                      ? `0 0 28px ${imageAnalysis.dominantColorHex}99, 0 0 56px ${imageAnalysis.dominantColorHex}66, 0 0 80px ${imageAnalysis.dominantColorHex}44`
+                      : "none",
+                    transition: "box-shadow 0.7s ease",
+                  }}
                 >
                   创建
                 </button>

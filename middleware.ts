@@ -5,19 +5,17 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   const isProtectedRoute =
-    path === "/timeline" || path.startsWith("/timeline/");
-  const isLoginRoute = path === "/login";
-
+    path === "/timeline" ||
+    path.startsWith("/timeline/") ||
+    path === "/dashboard" ||
+    path === "/gallery";
   const hasSession = Boolean(request.cookies.get("session")?.value);
 
   if (isProtectedRoute && !hasSession) {
     return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
-  if (isLoginRoute && hasSession) {
-    return NextResponse.redirect(new URL("/timeline", request.nextUrl));
-  }
-
+  // 已登录时也允许访问 /login，方便在登录页点「退出登录」
   return NextResponse.next();
 }
 

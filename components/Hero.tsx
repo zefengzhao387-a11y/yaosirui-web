@@ -2,8 +2,32 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function Hero() {
+  const [user, setUser] = useState<{ id: string; email: string; name: string | null } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        if (!isMounted) return;
+        if (!res.ok) {
+          setUser(null);
+          return;
+        }
+        const data = (await res.json()) as { user: { id: string; email: string; name: string | null } };
+        setUser(data.user);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setUser(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <section className="relative h-screen flex flex-col items-center justify-center text-center px-4 overflow-hidden">
       <motion.div
@@ -33,14 +57,14 @@ export default function Hero() {
           >
             开启探索之旅 <ArrowRight size={20} />
           </motion.button>
-          
-          <motion.button
+          <motion.a
+            href={user ? "/dashboard" : "/login"}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="px-10 py-4 glass rounded-full font-medium border border-white/20 text-white hover:bg-white/5 transition-all"
           >
-            了解更多
-          </motion.button>
+            {user ? "个人主页" : "登录 / 注册"}
+          </motion.a>
         </div>
       </motion.div>
       

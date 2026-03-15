@@ -5,9 +5,32 @@ import Starfield from "@/components/Starfield";
 import FeatureSection from "@/components/FeatureSection";
 import EmotionBubbles from "@/components/EmotionBubbles";
 import { motion, useScroll, useSpring } from "framer-motion";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const { scrollYProgress } = useScroll();
+  const [user, setUser] = useState<{ id: string; email: string; name: string | null } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        if (!isMounted) return;
+        if (!res.ok) {
+          setUser(null);
+          return;
+        }
+        const data = (await res.json()) as { user: { id: string; email: string; name: string | null } };
+        setUser(data.user);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setUser(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
@@ -62,10 +85,10 @@ export default function Home() {
             加入我们，将珍贵的回忆保存在这个永恒的数字化空间。
           </p>
           <button 
-            onClick={() => window.location.href = '/login'}
+            onClick={() => window.location.href = user ? '/dashboard' : '/login'}
             className="px-12 py-4 bg-white text-black font-bold text-xl rounded-full hover:bg-morandi-cream transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
           >
-            立即注册
+            {user ? "个人主页" : "立即注册"}
           </button>
         </section>
 

@@ -60,6 +60,7 @@ export async function GET(request: Request) {
         url: m.imageUrl ?? "",
         title: m.title,
         date: toMonthDay(m.date),
+        year: String(m.date.getFullYear()),
         location: m.location ?? "",
         text: m.content ?? "",
       })),

@@ -55,7 +55,10 @@ export default function Navbar() {
           >
             多维时空轴
           </Link>
-          {["影廊", "心语", "阁楼", "留言"].map((item) => (
+          <Link href="/gallery" className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide">
+            影廊
+          </Link>
+          {["心语", "阁楼", "留言"].map((item) => (
             <Link 
               key={item} 
               href={`#${item}`} 
@@ -100,13 +103,14 @@ export default function Navbar() {
           animate={{ opacity: 1, y: 0 }}
           className="absolute top-28 left-6 right-6 glass p-10 rounded-[2rem] md:hidden flex flex-col gap-8 bg-black/60 backdrop-blur-2xl border border-white/10 shadow-3xl"
         >
-          {["多维时空轴", "影廊", "心语", "阁楼", "留言"].map((item) => (
-            <Link 
-              key={item} 
-              href={item === "多维时空轴" ? "/timeline" : `#${item}`} 
-              className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors"
-              onClick={() => setIsOpen(false)}
-            >
+          <Link href="/timeline" className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
+            多维时空轴
+          </Link>
+          <Link href="/gallery" className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
+            影廊
+          </Link>
+          {["心语", "阁楼", "留言"].map((item) => (
+            <Link key={item} href={`#${item}`} className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
               {item}
             </Link>
           ))}

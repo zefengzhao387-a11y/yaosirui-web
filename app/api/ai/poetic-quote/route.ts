@@ -32,7 +32,6 @@ export async function POST(request: Request) {
 
   const baseURL = getEnv("OPENAI_BASE_URL") || undefined;
   const model = getEnv("AI_POETIC_MODEL") || (baseURL?.includes("deepseek") ? "deepseek-chat" : "gpt-4o-mini");
-  const openai = createOpenAI({ apiKey, baseURL: baseURL || undefined });
 
   let body: { colors?: string[]; tags?: string[]; mood?: string };
   try {
@@ -49,22 +48,75 @@ export async function POST(request: Request) {
 
   const prompt = `你是一位诗人。根据以下画面元素：${elementStr}，生成一段 20 字以内的${mood}诗意引言。只输出这一句话，不要引号、不要解释、不要换行。`;
 
+  const useChatCompletions = baseURL?.toLowerCase().includes("deepseek");
+
   try {
-    const { text } = await generateText({
-      model: openai(model as "gpt-4o-mini"),
-      prompt,
-    });
+    let text: string;
+    if (useChatCompletions && baseURL) {
+      // DeepSeek 等只支持 /v1/chat/completions，不走 SDK 的 /responses
+      const chatUrl = baseURL.replace(/\/$/, "") + (baseURL.includes("/v1") ? "" : "/v1") + "/chat/completions";
+      const res = await fetch(chatUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 60,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errMsg = (data as { error?: { message?: string } }).error?.message || data.message || res.statusText;
+        throw new Error(errMsg || `HTTP ${res.status}`);
+      }
+      text = (data as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
+    } else {
+      const openai = createOpenAI({ apiKey, baseURL: baseURL || undefined });
+      const result = await generateText({
+        model: openai(model as "gpt-4o-mini"),
+        prompt,
+      });
+      text = result.text ?? "";
+    }
     const quote = (text || "").trim().replace(/^[""]|[""]$/g, "");
     return NextResponse.json({ quote });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e);
-    console.error("poetic-quote error:", e);
+    const detail = await getErrorMessage(e);
+    console.error("poetic-quote error:", detail, e);
     return NextResponse.json(
       {
         error: "生成失败",
-        detail: message,
+        detail,
       },
       { status: 500 }
     );
   }
+}
+
+async function getErrorMessage(e: unknown): Promise<string> {
+  if (e instanceof Error) {
+    let msg = e.message;
+    const cause = (e as Error & { cause?: unknown }).cause;
+    if (cause && typeof cause === "object" && "message" in cause) {
+      msg += " | " + String((cause as { message: string }).message);
+    }
+    if (cause && typeof cause === "object" && "response" in cause) {
+      const res = (cause as { response?: Response }).response;
+      if (res && typeof res.status === "number") {
+        msg += ` [HTTP ${res.status}]`;
+        try {
+          const body = await res.text();
+          if (body) msg += " " + body.slice(0, 200);
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return msg;
+  }
+  if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
+  return String(e);
 }
