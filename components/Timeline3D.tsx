@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Float, OrbitControls, PerspectiveCamera, Stars, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 
 interface MemoryNodeProps {
   position: [number, number, number];
@@ -74,50 +75,73 @@ function MemoryNode({ position, year, title, color, onClick }: MemoryNodeProps) 
   );
 }
 
-const memoryData = [
-  { 
-    year: "2020", 
-    title: "初遇：在春天的午后", 
-    color: "#9bb0a5", 
-    pos: [0, 0, 0] as [number, number, number],
-    highlights: ["/photo1.jpg", "/photo2.jpg"],
-    summary: "那一年，我们在春天的午后初次相遇。樱花飘落，微风不燥。那是所有故事的开始，每一张照片都记录着当时羞涩的笑容。"
-  },
-  { 
-    year: "2021", 
-    title: "旅行：海边的篝火", 
-    color: "#d4a5a5", 
-    pos: [5, 2, -5] as [number, number, number],
-    highlights: ["/photo3.jpg", "/photo4.jpg"],
-    summary: "2021年的夏天，我们去了向往已久的海边。夜晚的篝火映照着彼此的面孔，海浪声成了我们谈话的背景音乐。"
-  },
-  { 
-    year: "2022", 
-    title: "奋斗：深夜的台灯", 
-    color: "#dcd0c0", 
-    pos: [-5, -2, -10] as [number, number, number],
-    highlights: ["/photo1.jpg", "/photo3.jpg"],
-    summary: "这一年是忙碌而充实的。无数个深夜，只有那一盏台灯陪伴着我们。虽然辛苦，但每一步都走得异常坚定。"
-  },
-  { 
-    year: "2023", 
-    title: "收获：第一份成功的喜悦", 
-    color: "#d1d5db", 
-    pos: [8, 4, -15] as [number, number, number],
-    highlights: ["/photo2.jpg", "/photo4.jpg"],
-    summary: "努力终于迎来了回报。那一刻的欢呼与泪水，都凝聚在这些珍贵的影像中。这是属于我们的高光时刻。"
-  },
-  { 
-    year: "2024", 
-    title: "展望：星辰大海的征程", 
-    color: "#fdf5e6", 
-    pos: [-3, 1, -20] as [number, number, number],
-    highlights: ["/photo1.jpg", "/photo4.jpg"],
-    summary: "2024，我们站在新的起点。未来的路还很长，但只要心中有光，脚下就有力量。我们将继续编织这段永恒的交响。"
-  },
-];
+type TimelineNode = {
+  year: string;
+  title: string;
+  summary: string;
+  highlights: string[];
+  color: string;
+  pos: [number, number, number];
+};
 
-function TimelineScene({ onNodeClick }: { onNodeClick: (data: any) => void }) {
+type YearSummaryDTO = {
+  year: string;
+  title: string;
+  summary: string;
+  highlights: string[];
+};
+
+const COLOR_PALETTE = ["#9bb0a5", "#d4a5a5", "#dcd0c0", "#d1d5db", "#fdf5e6"];
+
+function hashString(input: string) {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    h = (h << 5) - h + input.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function computePos(index: number, total: number): [number, number, number] {
+  const angle = total <= 1 ? 0 : (index / total) * Math.PI * 2;
+  const radius = Math.max(2, 4 + total * 0.8);
+  const x = Math.cos(angle) * radius;
+  const z = Math.sin(angle) * radius * 0.8 - index * 1.5;
+  const y = ((index % 3) - 1) * 1.6;
+  return [x, y, z];
+}
+
+function buildNodes(years: YearSummaryDTO[]): TimelineNode[] {
+  const sorted = [...years].sort((a, b) => a.year.localeCompare(b.year));
+  return sorted.map((y, idx) => {
+    const color = COLOR_PALETTE[hashString(y.year) % COLOR_PALETTE.length];
+    return {
+      year: y.year,
+      title: y.title,
+      summary: y.summary,
+      highlights: Array.isArray(y.highlights) ? y.highlights.slice(0, 2) : [],
+      color,
+      pos: computePos(idx, sorted.length),
+    };
+  });
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("READ_FAILED"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function TimelineScene({
+  nodes,
+  onNodeClick,
+}: {
+  nodes: TimelineNode[];
+  onNodeClick: (data: TimelineNode) => void;
+}) {
   return (
     <>
       <color attach="background" args={["#050505"]} />
@@ -125,7 +149,7 @@ function TimelineScene({ onNodeClick }: { onNodeClick: (data: any) => void }) {
       <ambientLight intensity={1} />
       <pointLight position={[10, 10, 10]} intensity={5} />
       
-      {memoryData.map((node, i) => (
+      {nodes.map((node, i) => (
         <MemoryNode 
           key={i} 
           position={node.pos} 
@@ -148,10 +172,182 @@ function TimelineScene({ onNodeClick }: { onNodeClick: (data: any) => void }) {
 }
 
 export default function Timeline3D() {
-  const [selectedNode, setSelectedNode] = React.useState<any>(null);
+  const [nodes, setNodes] = React.useState<TimelineNode[]>([]);
+  const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
+  const selectedNode = React.useMemo(
+    () => (selectedYear ? nodes.find((n) => n.year === selectedYear) ?? null : null),
+    [nodes, selectedYear]
+  );
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [isZooming, setIsZooming] = React.useState(false);
+  const [editForm, setEditForm] = React.useState<{
+    title: string;
+    summary: string;
+    highlights: string[];
+  }>({ title: "", summary: "", highlights: [] });
+  const fileInputsRef = React.useRef<Array<HTMLInputElement | null>>([]);
+
+  const [createForm, setCreateForm] = React.useState<{
+    year: string;
+    title: string;
+    summary: string;
+    highlights: string[];
+  }>({ year: "", title: "", summary: "", highlights: [] });
+  const createFileInputsRef = React.useRef<Array<HTMLInputElement | null>>([]);
+
+  const refreshYears = React.useCallback(() => {
+    fetch("/api/year-summaries")
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as { years: YearSummaryDTO[] };
+        setNodes(buildNodes(data.years || []));
+      })
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    refreshYears();
+  }, [refreshYears]);
+
+  const handleDeepDive = () => {
+    setIsZooming(true);
+    // 模拟相机推进效果后跳转
+    setTimeout(() => {
+      window.location.href = `/timeline/${selectedNode.year}`;
+    }, 1000);
+  };
+
+  const startEdit = () => {
+    if (!selectedNode) return;
+    setEditForm({
+      title: selectedNode.title,
+      summary: selectedNode.summary,
+      highlights: [...selectedNode.highlights],
+    });
+    setIsEditing(true);
+  };
+
+  const setHighlight = (index: number, url: string) => {
+    setEditForm((prev) => {
+      const next = [...prev.highlights];
+      while (next.length <= index) next.push("");
+      next[index] = url;
+      return { ...prev, highlights: next };
+    });
+  };
+
+  const setCreateHighlight = (index: number, url: string) => {
+    setCreateForm((prev) => {
+      const next = [...prev.highlights];
+      while (next.length <= index) next.push("");
+      next[index] = url;
+      return { ...prev, highlights: next };
+    });
+  };
+
+  const handlePickFile = (index: number) => {
+    fileInputsRef.current[index]?.click();
+  };
+
+  const handleFileChange = (index: number, file: File | null) => {
+    if (!file) return;
+    fileToDataUrl(file)
+      .then((url) => setHighlight(index, url))
+      .catch(() => {});
+  };
+
+  const handlePickCreateFile = (index: number) => {
+    createFileInputsRef.current[index]?.click();
+  };
+
+  const handleCreateFileChange = (index: number, file: File | null) => {
+    if (!file) return;
+    fileToDataUrl(file)
+      .then((url) => setCreateHighlight(index, url))
+      .catch(() => {});
+  };
+
+  const handleSaveEdit = () => {
+    if (!selectedNode) return;
+    const payload = {
+      year: selectedNode.year,
+      title: editForm.title.trim() || selectedNode.title,
+      summary: editForm.summary,
+      highlights: editForm.highlights.filter(Boolean).slice(0, 2),
+    };
+
+    fetch("/api/year-summaries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          setIsEditing(false);
+          return;
+        }
+        const data = (await res.json()) as {
+          year: { year: string; title: string; summary: string; highlights: string[] };
+        };
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.year === data.year.year
+              ? {
+                  ...n,
+                  title: data.year.title,
+                  summary: data.year.summary,
+                  highlights: data.year.highlights.slice(0, 2),
+                }
+              : n
+          )
+        );
+        setIsEditing(false);
+      })
+      .catch(() => setIsEditing(false));
+  };
+
+  const handleCreateYear = () => {
+    const year = createForm.year.trim();
+    if (!/^\d{4}$/.test(year)) {
+      alert("年份必须是 4 位数字");
+      return;
+    }
+    const title = createForm.title.trim();
+    if (!title) {
+      alert("标题不能为空");
+      return;
+    }
+
+    fetch("/api/year-summaries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        year,
+        title,
+        summary: createForm.summary,
+        highlights: createForm.highlights.filter(Boolean).slice(0, 2),
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          alert(data?.error || "创建失败");
+          return;
+        }
+        setIsCreating(false);
+        setCreateForm({ year: "", title: "", summary: "", highlights: [] });
+        refreshYears();
+      })
+      .catch(() => alert("创建失败"));
+  };
+
+  React.useEffect(() => {
+    return () => {};
+  }, []);
 
   return (
-    <div className="w-full h-screen bg-[#0a0a0a] overflow-hidden relative">
+    <div className={`w-full h-screen bg-[#0a0a0a] overflow-hidden relative transition-opacity duration-1000 ${isZooming ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}>
       <div className="absolute top-24 left-10 z-10 text-white max-w-md pointer-events-none">
         <h1 className="text-4xl font-serif mb-4">多维时空轴</h1>
         <p className="text-morandi-sage opacity-80">
@@ -161,8 +357,39 @@ export default function Timeline3D() {
       
       <Canvas gl={{ alpha: false, antialias: true }} style={{ height: "100%", width: "100%" }}>
         <PerspectiveCamera makeDefault position={[0, 0, 15]} fov={50} />
-        <TimelineScene onNodeClick={setSelectedNode} />
+        <TimelineScene
+          nodes={nodes}
+          onNodeClick={(node) => setSelectedYear(node.year)}
+        />
       </Canvas>
+
+      {nodes.length === 0 && !isCreating && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center">
+          <div className="glass px-10 py-8 rounded-[2rem] border border-white/10 bg-black/30 backdrop-blur-xl text-center">
+            <div className="text-white text-2xl font-serif mb-2">你的时间轴还是空的</div>
+            <div className="text-white/60 text-sm mb-6">先创建一个年份星团开始吧</div>
+            <button
+              type="button"
+              onClick={() => setIsCreating(true)}
+              className="px-8 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
+            >
+              添加年份
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isCreating && (
+        <div className="absolute top-28 right-10 z-30">
+          <button
+            type="button"
+            onClick={() => setIsCreating(true)}
+            className="glass px-6 py-3 rounded-full text-white/80 hover:text-white border border-white/10 bg-black/30 backdrop-blur-xl transition-all"
+          >
+            + 添加年份
+          </button>
+        </div>
+      )}
       
       <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10">
         <div className="glass px-6 py-2 rounded-full text-white/60 text-sm animate-pulse">
@@ -172,20 +399,20 @@ export default function Timeline3D() {
 
       {/* 记忆详情弹窗 */}
       <AnimatePresence>
-        {selectedNode && (
+        {selectedNode && !isEditing && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
-            onClick={() => setSelectedNode(null)}
+            onClick={() => setSelectedYear(null)}
           >
             <motion.div 
               className="bg-white/90 dark:bg-slate-900/90 w-full max-w-4xl max-h-[80vh] overflow-y-auto rounded-[2rem] shadow-2xl border border-white/20 p-8 md:p-12 relative"
               onClick={(e) => e.stopPropagation()}
             >
               <button 
-                onClick={() => setSelectedNode(null)}
+                onClick={() => setSelectedYear(null)}
                 className="absolute top-6 right-6 w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 transition-colors"
               >
                 ✕
@@ -206,7 +433,7 @@ export default function Timeline3D() {
 
                   <div className="flex flex-col gap-4">
                     <button 
-                      onClick={() => window.location.href = `/timeline/${selectedNode.year}`}
+                      onClick={handleDeepDive}
                       className="w-full py-4 bg-morandi-midnightBlue text-morandi-cream rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-opacity-90 transition-all shadow-lg"
                     >
                       深入记忆星团 <ArrowRight size={20} />
@@ -215,7 +442,10 @@ export default function Timeline3D() {
                       <button className="flex-1 py-3 border border-morandi-sage/30 rounded-2xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all">
                         播放语音旁白
                       </button>
-                      <button className="flex-1 py-3 border border-morandi-sage/30 rounded-2xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all">
+                      <button 
+                        onClick={startEdit}
+                        className="flex-1 py-3 border border-morandi-sage/30 rounded-2xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all"
+                      >
                         编辑记忆
                       </button>
                     </div>
@@ -238,6 +468,229 @@ export default function Timeline3D() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 编辑记忆弹窗 */}
+      <AnimatePresence>
+        {isEditing && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          >
+            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-8 shadow-2xl border border-white/20">
+              <h2 className="text-2xl font-serif mb-6 text-morandi-midnightBlue dark:text-morandi-cream">编辑 {selectedNode.year} 年度记忆</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-1">记忆标题</label>
+                  <input 
+                    type="text" 
+                    value={editForm.title}
+                    onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                    className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-1">年度总结</label>
+                  <textarea 
+                    rows={4}
+                    value={editForm.summary}
+                    onChange={(e) => setEditForm((p) => ({ ...p, summary: e.target.value }))}
+                    className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                  ></textarea>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-3">年度照片</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[0, 1].map((idx) => (
+                      <div key={idx} className="space-y-3">
+                        <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-morandi-sage/20 bg-morandi-sage/5">
+                          {editForm.highlights[idx] ? (
+                            <img
+                              src={editForm.highlights[idx]}
+                              alt={`highlight-${idx}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-sm text-morandi-midnightBlue/60 dark:text-morandi-cream/60">
+                              暂无照片
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          ref={(el) => {
+                            fileInputsRef.current[idx] = el;
+                          }}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleFileChange(idx, e.target.files?.[0] ?? null)
+                          }
+                        />
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handlePickFile(idx)}
+                            className="flex-1 py-2.5 bg-morandi-midnightBlue text-morandi-cream rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                          >
+                            选择照片
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHighlight(idx, "")}
+                            className="px-4 py-2.5 border border-morandi-sage/30 rounded-xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all"
+                          >
+                            清空
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="也可以粘贴图片 URL"
+                          value={editForm.highlights[idx] || ""}
+                          onChange={(e) => setHighlight(idx, e.target.value)}
+                          className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-8">
+                  <button 
+                    onClick={() => setIsEditing(false)}
+                    className="flex-1 py-3 border border-morandi-sage/30 rounded-xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    onClick={handleSaveEdit}
+                    className="flex-1 py-3 bg-morandi-midnightBlue text-morandi-cream rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                  >
+                    保存修改
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isCreating && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed inset-0 z-[320] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          >
+            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-8 shadow-2xl border border-white/20">
+              <h2 className="text-2xl font-serif mb-6 text-morandi-midnightBlue dark:text-morandi-cream">创建年份星团</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-1">年份</label>
+                  <input
+                    type="text"
+                    placeholder="例如 2026"
+                    value={createForm.year}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, year: e.target.value }))}
+                    className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-1">记忆标题</label>
+                  <input
+                    type="text"
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
+                    className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-1">年度总结</label>
+                  <textarea
+                    rows={4}
+                    value={createForm.summary}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, summary: e.target.value }))}
+                    className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-morandi-sage mb-3">年度照片</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[0, 1].map((idx) => (
+                      <div key={idx} className="space-y-3">
+                        <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-morandi-sage/20 bg-morandi-sage/5">
+                          {createForm.highlights[idx] ? (
+                            <img
+                              src={createForm.highlights[idx]}
+                              alt={`create-highlight-${idx}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-sm text-morandi-midnightBlue/60 dark:text-morandi-cream/60">
+                              暂无照片
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          ref={(el) => {
+                            createFileInputsRef.current[idx] = el;
+                          }}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleCreateFileChange(idx, e.target.files?.[0] ?? null)
+                          }
+                        />
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handlePickCreateFile(idx)}
+                            className="flex-1 py-2.5 bg-morandi-midnightBlue text-morandi-cream rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                          >
+                            选择照片
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreateHighlight(idx, "")}
+                            className="px-4 py-2.5 border border-morandi-sage/30 rounded-xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all"
+                          >
+                            清空
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="也可以粘贴图片 URL"
+                          value={createForm.highlights[idx] || ""}
+                          onChange={(e) => setCreateHighlight(idx, e.target.value)}
+                          className="w-full bg-morandi-sage/5 border border-morandi-sage/20 rounded-xl px-4 py-3 text-morandi-midnightBlue dark:text-morandi-cream focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-8">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreating(false)}
+                    className="flex-1 py-3 border border-morandi-sage/30 rounded-xl font-medium text-morandi-midnightBlue dark:text-morandi-cream hover:bg-morandi-sage/5 transition-all"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateYear}
+                    className="flex-1 py-3 bg-morandi-midnightBlue text-morandi-cream rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                  >
+                    创建
+                  </button>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

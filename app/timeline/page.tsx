@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 export default function TimelinePage() {
   return (
     <main className="relative min-h-screen bg-black text-white">
+      <Navbar />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

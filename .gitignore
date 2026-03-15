@@ -34,3 +34,5 @@ Thumbs.db
 # TypeScript
 next-env.d.ts
 *.tsbuildinfo
+
+/lib/generated/prisma

@@ -6,7 +6,7 @@ import React from "react";
 import * as random from "maath/random";
 
 function Stars(props: any) {
-  const ref = React.useRef<any>();
+  const ref = React.useRef<any>(null);
   const [sphere] = React.useState(() => {
     const s = random.inSphere(new Float32Array(6000), { radius: 1.5 });
     // Check for NaN and filter them out if they exist

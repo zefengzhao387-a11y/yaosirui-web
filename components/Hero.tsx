@@ -12,14 +12,14 @@ export default function Hero() {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="z-10"
       >
-        <h1 className="text-6xl md:text-8xl font-serif mb-6 tracking-tight text-morandi-midnightBlue dark:text-morandi-cream">
+        <h1 className="text-6xl md:text-8xl font-serif mb-6 tracking-tight text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
           永恒交响
-          <span className="block text-2xl md:text-4xl font-sans mt-2 opacity-80">
+          <span className="block text-2xl md:text-4xl font-sans mt-2 opacity-60">
             Eternal Symphony
           </span>
         </h1>
         
-        <p className="max-w-2xl mx-auto text-lg md:text-xl text-morandi-sage mb-10 font-sans leading-relaxed">
+        <p className="max-w-2xl mx-auto text-lg md:text-xl text-morandi-sage mb-10 font-sans leading-relaxed opacity-90">
           一个跨越维度的数字化回忆博物馆。
           在这里，碎片化的记忆被编织成永恒的乐章。
         </p>
@@ -28,7 +28,8 @@ export default function Hero() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-8 py-3 bg-morandi-midnightBlue text-morandi-cream rounded-full font-medium flex items-center gap-2 hover:bg-opacity-90 transition-all shadow-lg"
+            onClick={() => window.location.href = '/timeline'}
+            className="px-10 py-4 bg-white text-black rounded-full font-bold flex items-center gap-2 hover:bg-morandi-cream transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
           >
             开启探索之旅 <ArrowRight size={20} />
           </motion.button>
@@ -36,7 +37,7 @@ export default function Hero() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-8 py-3 glass rounded-full font-medium border border-morandi-sage text-morandi-midnightBlue dark:text-morandi-cream transition-all"
+            className="px-10 py-4 glass rounded-full font-medium border border-white/20 text-white hover:bg-white/5 transition-all"
           >
             了解更多
           </motion.button>
