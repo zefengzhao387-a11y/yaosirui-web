@@ -76,6 +76,28 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Register error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Missing JWT_SECRET")) {
+      return NextResponse.json(
+        { error: "服务端缺少 JWT_SECRET 环境变量，无法创建会话" },
+        { status: 500 }
+      );
+    }
+    if (
+      message.includes("P1000") ||
+      message.includes("P1001") ||
+      message.includes("P1002") ||
+      message.includes("P1012") ||
+      message.includes("P2021") ||
+      message.toLowerCase().includes("database") ||
+      message.toLowerCase().includes("sqlite") ||
+      message.toLowerCase().includes("postgres")
+    ) {
+      return NextResponse.json(
+        { error: "服务端数据库不可用：请检查 DATABASE_URL / 迁移 / 数据库服务" },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: "注册失败，请检查数据库连接" },
       { status: 500 }
