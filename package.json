@@ -4,7 +4,7 @@
   "private": true,
   "description": "Next.js 15 + React 19 + TypeScript + Tailwind 全栈项目",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

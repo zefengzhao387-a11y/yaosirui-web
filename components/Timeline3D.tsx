@@ -211,10 +211,12 @@ export default function Timeline3D() {
   }, [refreshYears]);
 
   const handleDeepDive = () => {
+    if (!selectedNode) return;
+    const year = selectedNode.year;
     setIsZooming(true);
     // 模拟相机推进效果后跳转
     setTimeout(() => {
-      window.location.href = `/timeline/${selectedNode.year}`;
+      window.location.href = `/timeline/${year}`;
     }, 1000);
   };
 
@@ -482,7 +484,7 @@ export default function Timeline3D() {
             className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
           >
             <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-8 shadow-2xl border border-white/20">
-              <h2 className="text-2xl font-serif mb-6 text-morandi-midnightBlue dark:text-morandi-cream">编辑 {selectedNode.year} 年度记忆</h2>
+              <h2 className="text-2xl font-serif mb-6 text-morandi-midnightBlue dark:text-morandi-cream">编辑 {selectedYear ?? ""} 年度记忆</h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-morandi-sage mb-1">记忆标题</label>
