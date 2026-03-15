@@ -522,19 +522,19 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-2xl"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-zinc-900 w-full max-w-xl rounded-3xl p-8 shadow-2xl border border-white/10"
+              className="bg-zinc-900 w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
             >
-              <h2 className="text-2xl font-serif mb-6 text-white">编辑记忆笔记</h2>
-              <div className="space-y-4">
+              <h2 className="text-xl font-serif py-4 px-6 text-white border-b border-white/10 flex-shrink-0">编辑记忆笔记</h2>
+              <div className="overflow-y-auto flex-1 min-h-0 p-6 space-y-4">
                 {editForm?.type === "image" && (
                   <div className="space-y-3">
                     <label className="block text-xs font-bold text-morandi-sage uppercase tracking-widest mb-2">照片</label>
-                    <div className="aspect-[3/4] w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+                    <div className="aspect-[3/4] max-h-44 w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5">
                       {editForm.url ? (
                         <img
                           src={editForm.url}
@@ -617,20 +617,20 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
                   ></textarea>
                 </div>
-                <div className="flex gap-4 mt-8">
-                  <button 
-                    onClick={handleCancelEdit}
-                    className="flex-1 py-3 border border-white/10 rounded-xl font-medium text-white/60 hover:bg-white/5 transition-all"
-                  >
-                    取消
-                  </button>
-                  <button 
-                    onClick={handleSaveEdit}
-                    className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
-                  >
-                    确认保存
-                  </button>
-                </div>
+              </div>
+              <div className="flex gap-4 p-6 border-t border-white/10 flex-shrink-0">
+                <button 
+                  onClick={handleCancelEdit}
+                  className="flex-1 py-3 border border-white/10 rounded-xl font-medium text-white/60 hover:bg-white/5 transition-all"
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={handleSaveEdit}
+                  className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
+                >
+                  确认保存
+                </button>
               </div>
             </motion.div>
           </motion.div>
@@ -643,16 +643,16 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/90 backdrop-blur-2xl"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-zinc-900 w-full max-w-xl rounded-3xl p-8 shadow-2xl border border-white/10"
+              className="bg-zinc-900 w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden"
             >
-              <h2 className="text-2xl font-serif mb-6 text-white">添加记忆</h2>
-              <div className="space-y-4">
+              <h2 className="text-xl font-serif py-4 px-6 text-white border-b border-white/10 flex-shrink-0">添加记忆</h2>
+              <div className="overflow-y-auto flex-1 min-h-0 p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -681,7 +681,7 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                 {createForm.type === "image" && (
                   <div className="space-y-3">
                     <label className="block text-xs font-bold text-morandi-sage uppercase tracking-widest mb-2">照片</label>
-                    <div className="aspect-[3/4] w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+                    <div className="aspect-[3/4] max-h-44 w-full rounded-2xl overflow-hidden border border-white/10 bg-white/5">
                       {createForm.url ? (
                         <img src={createForm.url} alt="preview" className="w-full h-full object-cover" />
                       ) : (
@@ -763,23 +763,22 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-morandi-sage/50"
                   />
                 </div>
-
-                <div className="flex gap-4 mt-8">
-                  <button
-                    type="button"
-                    onClick={() => setIsCreating(false)}
-                    className="flex-1 py-3 border border-white/10 rounded-xl font-medium text-white/60 hover:bg-white/5 transition-all"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateMemory}
-                    className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
-                  >
-                    创建
-                  </button>
-                </div>
+              </div>
+              <div className="flex gap-4 p-6 border-t border-white/10 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsCreating(false)}
+                  className="flex-1 py-3 border border-white/10 rounded-xl font-medium text-white/60 hover:bg-white/5 transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateMemory}
+                  className="flex-1 py-3 bg-white text-black rounded-xl font-bold hover:bg-morandi-cream transition-all"
+                >
+                  创建
+                </button>
               </div>
             </motion.div>
           </motion.div>
