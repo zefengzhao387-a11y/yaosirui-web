@@ -126,12 +126,57 @@ function buildNodes(years: YearSummaryDTO[]): TimelineNode[] {
   });
 }
 
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("READ_FAILED"));
-    reader.readAsDataURL(file);
+const MAX_IMAGE_PX = 1200;
+const JPEG_QUALITY = 0.78;
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      if (w <= MAX_IMAGE_PX && h <= MAX_IMAGE_PX && file.size < 400_000) {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("READ_FAILED"));
+        reader.readAsDataURL(file);
+        return;
+      }
+      const scale = Math.min(MAX_IMAGE_PX / w, MAX_IMAGE_PX / h, 1);
+      const cw = Math.round(w * scale);
+      const ch = Math.round(h * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("READ_FAILED"));
+        reader.readAsDataURL(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, cw, ch);
+      try {
+        const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+        resolve(dataUrl);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("READ_FAILED"));
+        reader.readAsDataURL(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("READ_FAILED"));
+      reader.readAsDataURL(file);
+    };
+    img.src = url;
   });
 }
 
@@ -396,7 +441,12 @@ export default function Timeline3D() {
           error?: string;
         };
         if (!res.ok) {
-          alert(data?.error || "创建失败");
+          const msg =
+            data?.error ||
+            (res.status === 413
+              ? "请求体过大，请使用图片链接或更小的图片（单张建议小于 1MB）"
+              : "创建失败");
+          alert(msg);
           return;
         }
         setIsCreating(false);
@@ -433,7 +483,7 @@ export default function Timeline3D() {
         </p>
       </div>
       
-      <Canvas gl={{ alpha: false, antialias: true }} style={{ height: "100%", width: "100%" }}>
+      <Canvas dpr={[1, 3]} gl={{ alpha: false, antialias: true }} style={{ height: "100%", width: "100%" }}>
         <PerspectiveCamera makeDefault position={[0, 0, 15]} fov={50} />
         <TimelineScene
           nodes={nodes}

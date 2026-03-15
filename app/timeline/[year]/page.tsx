@@ -95,12 +95,20 @@ function FloatingMemory({
         <Html transform distanceFactor={40} occlude>
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="w-48 glass rounded-2xl overflow-hidden border border-white/20 cursor-pointer shadow-2xl"
+            className="w-64 sm:w-72 glass rounded-2xl overflow-hidden border border-white/20 cursor-pointer shadow-2xl"
             onClick={onClick}
           >
             {memory.type === "image" && (
-              <div className="aspect-[4/3] overflow-hidden">
-                <img src={memory.url} alt={memory.title} className="w-full h-full object-cover" />
+              <div className="aspect-[4/3] overflow-hidden bg-black/20">
+                <img
+                  src={memory.url}
+                  alt={memory.title}
+                  className="w-full h-full object-cover"
+                  width={288}
+                  height={216}
+                  decoding="async"
+                  fetchPriority="low"
+                />
               </div>
             )}
             <div className="p-3 bg-black/40 backdrop-blur-md">
@@ -659,7 +667,7 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
     <main className="w-full h-screen bg-[#050505] overflow-hidden relative">
       {/* 3D Space - 降低 z-index 确保 UI 在上 */}
       <div ref={canvasContainerRef} className="absolute inset-0 z-0">
-        <Canvas dpr={[1, 2]} gl={{ antialias: true }} style={{ pointerEvents: 'auto' }}>
+        <Canvas dpr={[1, 3]} gl={{ antialias: true }} style={{ pointerEvents: 'auto' }}>
           <TimelineScene
             groupedMemories={groupedMemories}
             setSelectedMemory={setSelectedMemory}

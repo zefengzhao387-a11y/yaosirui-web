@@ -39,6 +39,8 @@ export async function GET() {
   });
 }
 
+const MAX_BODY_BYTES = 6 * 1024 * 1024; // 6MB，两张 base64 图可能较大
+
 export async function POST(request: Request) {
   const session = await getSession();
   let userId: string;
@@ -48,7 +50,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const raw = await request.text();
+  let raw: string;
+  try {
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { error: "请求体过大，请使用图片链接或更小的图片（单张建议小于 1MB）" },
+        { status: 413 }
+      );
+    }
+    raw = await request.text();
+    if (raw.length > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { error: "请求体过大，请使用图片链接或更小的图片（单张建议小于 1MB）" },
+        { status: 413 }
+      );
+    }
+  } catch (e) {
+    return NextResponse.json(
+      { error: "请求体过大或读取失败，请使用图片链接或更小的图片" },
+      { status: 413 }
+    );
+  }
+
   let body: any;
   try {
     body = raw ? JSON.parse(raw) : {};
@@ -82,18 +106,26 @@ export async function POST(request: Request) {
     }, { status: 201 });
   }
 
-  const saved = await prisma.yearSummary.upsert({
-    where: { userId_year: { userId, year } },
-    create: { userId, year, title, summary, highlight1, highlight2 },
-    update: { title, summary, highlight1, highlight2 },
-  });
+  try {
+    const saved = await prisma.yearSummary.upsert({
+      where: { userId_year: { userId, year } },
+      create: { userId, year, title, summary, highlight1, highlight2 },
+      update: { title, summary, highlight1, highlight2 },
+    });
 
-  return NextResponse.json({
-    year: {
-      year: saved.year,
-      title: saved.title,
-      summary: saved.summary,
-      highlights: [saved.highlight1, saved.highlight2].filter(Boolean),
-    },
-  });
+    return NextResponse.json({
+      year: {
+        year: saved.year,
+        title: saved.title,
+        summary: saved.summary,
+        highlights: [saved.highlight1, saved.highlight2].filter(Boolean),
+      },
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "数据库写入失败";
+    return NextResponse.json(
+      { error: `创建失败：${message}` },
+      { status: 500 }
+    );
+  }
 }
