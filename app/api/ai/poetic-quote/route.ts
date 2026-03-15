@@ -51,7 +51,6 @@ export async function POST(request: Request) {
     const { text } = await generateText({
       model: google("gemini-1.5-flash"),
       prompt,
-      maxTokens: 60,
     });
     const quote = (text || "").trim().replace(/^[""]|[""]$/g, "");
     return NextResponse.json({ quote });
