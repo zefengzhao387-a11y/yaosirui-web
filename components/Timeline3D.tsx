@@ -135,12 +135,51 @@ function fileToDataUrl(file: File) {
   });
 }
 
+type FlyToRequest = {
+  target: [number, number, number];
+  cameraPos: [number, number, number];
+};
+
+function CameraFlyTo({
+  flyToRequest,
+  setFlyToRequest,
+  controlsRef,
+}: {
+  flyToRequest: FlyToRequest | null;
+  setFlyToRequest: (v: FlyToRequest | null) => void;
+  controlsRef: React.RefObject<any>;
+}) {
+  const { camera } = useThree();
+  const targetVec = React.useMemo(() => new THREE.Vector3(), []);
+  const cameraVec = React.useMemo(() => new THREE.Vector3(), []);
+
+  useFrame((_, delta) => {
+    if (!flyToRequest || !controlsRef.current) return;
+    targetVec.set(...flyToRequest.target);
+    cameraVec.set(...flyToRequest.cameraPos);
+    controlsRef.current.target.lerp(targetVec, Math.min(1, delta * 4));
+    camera.position.lerp(cameraVec, Math.min(1, delta * 4));
+    if (camera.position.distanceTo(cameraVec) < 0.05) {
+      controlsRef.current.target.copy(targetVec);
+      camera.position.copy(cameraVec);
+      setFlyToRequest(null);
+    }
+  });
+  return null;
+}
+
 function TimelineScene({
   nodes,
   onNodeClick,
+  flyToRequest,
+  setFlyToRequest,
+  controlsRef,
 }: {
   nodes: TimelineNode[];
   onNodeClick: (data: TimelineNode) => void;
+  flyToRequest: FlyToRequest | null;
+  setFlyToRequest: (v: FlyToRequest | null) => void;
+  controlsRef: React.RefObject<any>;
 }) {
   return (
     <>
@@ -160,13 +199,15 @@ function TimelineScene({
         />
       ))}
       
-      <OrbitControls 
-        enablePan={true} 
-        enableZoom={true} 
+      <OrbitControls
+        ref={controlsRef}
+        enablePan={true}
+        enableZoom={true}
         enableRotate={true}
         maxDistance={50}
         minDistance={2}
       />
+      <CameraFlyTo flyToRequest={flyToRequest} setFlyToRequest={setFlyToRequest} controlsRef={controlsRef} />
     </>
   );
 }
@@ -174,6 +215,8 @@ function TimelineScene({
 export default function Timeline3D() {
   const [nodes, setNodes] = React.useState<TimelineNode[]>([]);
   const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
+  const [flyToRequest, setFlyToRequest] = React.useState<FlyToRequest | null>(null);
+  const controlsRef = React.useRef<any>(null);
   const selectedNode = React.useMemo(
     () => (selectedYear ? nodes.find((n) => n.year === selectedYear) ?? null : null),
     [nodes, selectedYear]
@@ -362,8 +405,40 @@ export default function Timeline3D() {
         <TimelineScene
           nodes={nodes}
           onNodeClick={(node) => setSelectedYear(node.year)}
+          flyToRequest={flyToRequest}
+          setFlyToRequest={setFlyToRequest}
+          controlsRef={controlsRef}
         />
       </Canvas>
+
+      {/* 右侧：只显示已创建的年份，点击后视角飞向该星团并选中 */}
+      {nodes.length > 0 && (
+        <div className="absolute right-10 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3">
+          {nodes.map((node) => (
+            <button
+              key={node.year}
+              type="button"
+              onClick={() => {
+                setSelectedYear(node.year);
+                setFlyToRequest({
+                  target: node.pos,
+                  cameraPos: [node.pos[0], node.pos[1], node.pos[2] + 8],
+                });
+              }}
+              className={`group flex items-center justify-end gap-3 text-right transition-colors ${
+                selectedYear === node.year ? "text-morandi-sage" : "text-white/40 hover:text-white/70"
+              }`}
+            >
+              <span className="text-sm font-medium tabular-nums">{node.year}</span>
+              <div
+                className={`w-1.5 h-1.5 rounded-full transition-all ${
+                  selectedYear === node.year ? "bg-morandi-sage scale-125" : "bg-white/30 group-hover:bg-white/50 group-hover:w-2 group-hover:h-2"
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+      )}
 
       {nodes.length === 0 && !isCreating && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">

@@ -29,6 +29,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // 仅本地开发：虚拟账号，不连数据库；公网部署不会走这里
+    if (process.env.NODE_ENV !== "production" && email === "demo@local" && password === "demo123") {
+      await createSession({
+        id: "demo-local",
+        email: "demo@local",
+        name: "本地演示",
+      });
+      return NextResponse.json({
+        message: "登录成功（本地演示账号）",
+        user: { id: "demo-local", email: "demo@local", name: "本地演示" },
+      });
+    }
+
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: "邮箱格式不正确" }, { status: 400 });
     }

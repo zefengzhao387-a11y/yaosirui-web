@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
+const DEMO_USER_ID = "demo-local";
+
 function getUserIdOrThrow(session: any) {
   const userId = session?.user?.id;
   if (!userId || typeof userId !== "string") throw new Error("UNAUTHORIZED");
@@ -15,6 +17,11 @@ export async function GET() {
     userId = getUserIdOrThrow(session);
   } catch {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
+  // 本地演示账号不连库，返回空列表
+  if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID) {
+    return NextResponse.json({ years: [] });
   }
 
   const summaries = await prisma.yearSummary.findMany({
@@ -61,6 +68,14 @@ export async function POST(request: Request) {
   }
   if (!title) {
     return NextResponse.json({ error: "标题不能为空" }, { status: 400 });
+  }
+
+  // 本地演示账号无法写入数据库，给出明确提示
+  if (process.env.NODE_ENV !== "production" && userId === DEMO_USER_ID) {
+    return NextResponse.json(
+      { error: "本地演示账号仅可浏览，无法创建或修改。请用真实账号登录或在公网注册后使用。" },
+      { status: 400 }
+    );
   }
 
   const saved = await prisma.yearSummary.upsert({
