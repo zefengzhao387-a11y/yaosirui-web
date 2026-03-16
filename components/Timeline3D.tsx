@@ -468,18 +468,15 @@ export default function Timeline3D() {
     })
       .then(async (res) => {
         const text = await res.text();
-        let data: {
-          year?: { year: string; title: string; summary: string; highlights: string[] };
-          error?: string;
-        } | null = null;
+        let data: { year?: { year: string; title: string; summary: string; highlights: string[] }; error?: string } | null = null;
         try {
-          if (text) data = JSON.parse(text) as typeof data;
+          if (text) data = JSON.parse(text) as any;
         } catch {
           /* 平台可能返回非 JSON，如 413 时的 HTML */
         }
         if (!res.ok) {
           const reason =
-            data?.error ||
+            (data as any)?.error ||
             (res.status === 413
               ? "请求体过大，请使用图片链接或更小的图片（单张建议小于 1MB）"
               : res.status >= 500
