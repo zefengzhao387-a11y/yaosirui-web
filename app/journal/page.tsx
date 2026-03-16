@@ -259,13 +259,12 @@ export default function JournalPage() {
                     ),
                     ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-2" {...props} />,
                     ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-2" {...props} />,
-                    code: (codeProps) => {
-                      const { inline, ...props } = codeProps as any;
-                      const className = inline
-                        ? "px-1 py-0.5 rounded bg-white/10 text-[0.8em]"
-                        : "block rounded bg-black/60 border border-white/10 px-3 py-2 text-xs mt-2 mb-3 whitespace-pre-wrap";
-                      return <code className={className} {...props} />;
-                    },
+                    code: ({ node, ...props }) => (
+                      <code
+                        className="px-1 py-0.5 rounded bg-white/10 text-[0.8em]"
+                        {...props}
+                      />
+                    ),
                     img: ({ node, ...props }) => {
                       const rawSrc = (props as any).src as string | undefined;
                       if (!rawSrc) return null;
