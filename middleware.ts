@@ -8,7 +8,8 @@ export async function middleware(request: NextRequest) {
     path === "/timeline" ||
     path.startsWith("/timeline/") ||
     path === "/dashboard" ||
-    path === "/gallery";
+    path === "/gallery" ||
+    path === "/journal";
   const hasSession = Boolean(request.cookies.get("session")?.value);
 
   if (isProtectedRoute && !hasSession) {

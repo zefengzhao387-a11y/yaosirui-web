@@ -37,6 +37,16 @@ export default function Home() {
     restDelta: 0.001
   });
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    } finally {
+      window.location.href = "/";
+    }
+  };
+
   return (
     <main className="relative min-h-screen bg-[#050505] transition-colors duration-700">
       {/* Progress Bar */}
@@ -85,10 +95,16 @@ export default function Home() {
             加入我们，将珍贵的回忆保存在这个永恒的数字化空间。
           </p>
           <button 
-            onClick={() => window.location.href = user ? '/dashboard' : '/login'}
+            onClick={() => {
+              if (user) {
+                void handleLogout();
+              } else {
+                window.location.href = "/login";
+              }
+            }}
             className="px-12 py-4 bg-white text-black font-bold text-xl rounded-full hover:bg-morandi-cream transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
           >
-            {user ? "个人主页" : "立即注册"}
+            {user ? "退出登录" : "立即注册"}
           </button>
         </section>
 

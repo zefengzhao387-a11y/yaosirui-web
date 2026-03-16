@@ -17,23 +17,33 @@ interface MemoryNodeProps {
 
 function MemoryNode({ position, year, title, color, onClick }: MemoryNodeProps) {
   const meshRef = React.useRef<THREE.Mesh>(null);
+  const groupRef = React.useRef<THREE.Group>(null);
   const [hovered, setHovered] = React.useState(false);
-  
+
   useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+
+    // 整个星球（含光晕）一起上下浮动 & 呼吸缩放，保证始终对齐
+    if (groupRef.current) {
+      groupRef.current.position.y =
+        position[1] + Math.sin(t + position[0]) * 0.25;
+      const targetScale = hovered ? 1.55 : 1;
+      groupRef.current.scale.lerp(
+        new THREE.Vector3(targetScale, targetScale, targetScale),
+        0.12
+      );
+    }
+
+    // 仅实体球自转
     if (meshRef.current) {
-      meshRef.current.rotation.y += 0.01;
-      const t = state.clock.getElapsedTime();
-      meshRef.current.position.y = position[1] + Math.sin(t + position[0]) * 0.1;
-      
-      // 动态缩放
-      const targetScale = hovered ? 1.5 : 1;
-      meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+      meshRef.current.rotation.y += 0.005;
     }
   });
 
   return (
-    <group position={position}>
-      <mesh 
+    <group ref={groupRef} position={position}>
+      {/* 发光星球本体 */}
+      <mesh
         ref={meshRef}
         onClick={(e) => {
           e.stopPropagation();
@@ -42,18 +52,34 @@ function MemoryNode({ position, year, title, color, onClick }: MemoryNodeProps) 
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
       >
-        <sphereGeometry args={[0.6, 32, 32]} />
-        <meshStandardMaterial 
-          color={color} 
-          emissive={color} 
-          emissiveIntensity={hovered ? 5 : 2} 
+        <sphereGeometry args={[0.7, 64, 64]} />
+        <meshPhysicalMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={hovered ? 2.5 : 1.2}
+          roughness={0.12}
+          metalness={0.15}
+          clearcoat={1}
+          clearcoatRoughness={0.08}
+        />
+      </mesh>
+
+      {/* 柔和外发光晕（更梦幻） */}
+      <mesh>
+        <sphereGeometry args={[0.9, 48, 48]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={hovered ? 0.38 : 0.22}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
 
       {/* 年份标签 */}
       <Text
-        position={[0, 1.2, 0]}
-        fontSize={0.4}
+        position={[0, 1.4, 0]}
+        fontSize={0.42}
         color="white"
         anchorX="center"
         anchorY="middle"
@@ -251,7 +277,7 @@ function TimelineScene({
       
       {nodes.map((node, i) => (
         <MemoryNode 
-          key={i} 
+          key={`${node.year}-${i}`} 
           position={node.pos} 
           year={node.year} 
           title={node.title} 
@@ -419,6 +445,11 @@ export default function Timeline3D() {
       alert("年份必须是 4 位数字");
       return;
     }
+    // 不允许重复年份星团
+    if (nodes.some((n) => n.year === year)) {
+      alert("该年份已经有一个记忆星团了，不能重复创建相同年份。");
+      return;
+    }
     const title = createForm.title.trim();
     if (!title) {
       alert("标题不能为空");
@@ -436,17 +467,25 @@ export default function Timeline3D() {
       }),
     })
       .then(async (res) => {
-        const data = (await res.json().catch(() => null)) as {
+        const text = await res.text();
+        let data: {
           year?: { year: string; title: string; summary: string; highlights: string[] };
           error?: string;
-        };
+        } | null = null;
+        try {
+          if (text) data = JSON.parse(text) as typeof data;
+        } catch {
+          /* 平台可能返回非 JSON，如 413 时的 HTML */
+        }
         if (!res.ok) {
-          const msg =
+          const reason =
             data?.error ||
             (res.status === 413
               ? "请求体过大，请使用图片链接或更小的图片（单张建议小于 1MB）"
-              : "创建失败");
-          alert(msg);
+              : res.status >= 500
+                ? "服务器错误，请稍后重试。若使用了图片，请尝试更小图片或粘贴图片链接。"
+                : `请求失败 (${res.status})。若使用了图片，可能是图片过大，请尝试更小图片或粘贴图片链接。`);
+          alert(reason);
           return;
         }
         setIsCreating(false);
@@ -467,7 +506,11 @@ export default function Timeline3D() {
           refreshYears();
         }
       })
-      .catch(() => alert("创建失败"));
+      .catch(() => {
+        alert(
+          "网络或请求异常，创建失败。若使用了图片，请尝试使用更小图片或粘贴图片链接。"
+        );
+      });
   };
 
   React.useEffect(() => {
@@ -497,9 +540,9 @@ export default function Timeline3D() {
       {/* 右侧：只显示已创建的年份，点击后视角飞向该星团并选中 */}
       {nodes.length > 0 && (
         <div className="absolute right-10 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3">
-          {nodes.map((node) => (
+          {nodes.map((node, index) => (
             <button
-              key={node.year}
+              key={`${node.year}-${index}`}
               type="button"
               onClick={() => {
                 setSelectedYear(node.year);

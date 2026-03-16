@@ -58,7 +58,10 @@ export default function Navbar() {
           <Link href="/gallery" className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide">
             影廊
           </Link>
-          {["心语", "阁楼", "留言"].map((item) => (
+          <Link href="/journal" className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide">
+            心语瓶
+          </Link>
+          {["阁楼", "留言"].map((item) => (
             <Link 
               key={item} 
               href={`#${item}`} 
@@ -72,13 +75,12 @@ export default function Navbar() {
               <span className="text-white/70 text-sm">
                 {user.name || user.email}
               </span>
-              <button
-                type="button"
-                onClick={handleLogout}
+              <Link
+                href="/dashboard"
                 className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold hover:bg-morandi-cream transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)]"
               >
-                退出登录
-              </button>
+                个人主页
+              </Link>
             </div>
           ) : (
             <Link 
@@ -109,19 +111,31 @@ export default function Navbar() {
           <Link href="/gallery" className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
             影廊
           </Link>
-          {["心语", "阁楼", "留言"].map((item) => (
+          <Link href="/journal" className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
+            心语瓶
+          </Link>
+          {["阁楼", "留言"].map((item) => (
             <Link key={item} href={`#${item}`} className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
               {item}
             </Link>
           ))}
           {user ? (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full py-4 bg-white text-black text-center rounded-2xl font-bold text-lg"
-            >
-              退出登录
-            </button>
+            <>
+              <Link
+                href="/dashboard"
+                className="w-full py-4 bg-white text-black text-center rounded-2xl font-bold text-lg mb-2"
+                onClick={() => setIsOpen(false)}
+              >
+                个人主页
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full py-3 border border-white/30 text-white text-center rounded-2xl font-medium text-base"
+              >
+                退出登录
+              </button>
+            </>
           ) : (
             <Link 
               href="/login" 

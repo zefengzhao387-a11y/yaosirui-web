@@ -56,3 +56,46 @@
   transform: translate(-2px, -2px);
   box-shadow: 6px 6px 0px #000;
 }
+
+/* 心语瓶背景流光 */
+.emotion-streak {
+  position: absolute;
+  pointer-events: none;
+  filter: blur(12px);
+  mix-blend-mode: screen;
+  opacity: 1;
+  z-index: 1;
+}
+
+.emotion-streak-1 {
+  top: 8%;
+  left: -10%;
+  width: 120%;
+  height: 220px;
+  animation: emotion-streak-slide 16s linear infinite;
+}
+
+.emotion-streak-2 {
+  bottom: 4%;
+  right: -10%;
+  width: 120%;
+  height: 200px;
+  animation: emotion-streak-slide 20s linear infinite reverse;
+}
+
+@keyframes emotion-streak-slide {
+  0% {
+    transform: translateX(-10%) translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(110%) translateY(0);
+    opacity: 0;
+  }
+}

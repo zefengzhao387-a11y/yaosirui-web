@@ -75,8 +75,10 @@ export default function EmotionBubbles({
 }) {
   const [entries, setEntries] = useState<DiaryEntry[]>(propEntries ?? SAMPLE_ENTRIES);
   const [filterEmotion, setFilterEmotion] = useState<FilterEmotion>("all");
+  const [visibleEntries, setVisibleEntries] = useState<DiaryEntry[]>([]);
   const [poppedId, setPoppedId] = useState<string | null>(null);
   const [burst, setBurst] = useState<{ x: number; y: number; color: string } | null>(null);
+  const [batchKey, setBatchKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -103,11 +105,23 @@ export default function EmotionBubbles({
       })
       .catch(() => setEntries(SAMPLE_ENTRIES));
   }, [propEntries, fetchFromApi]);
-
-  const filteredEntries =
-    filterEmotion === "all"
-      ? entries
-      : entries.filter((e) => getEmotionFromText(e.summary) === filterEmotion);
+  // 依据当前情绪和 batchKey，随机挑选最多 10 个作为当前展示的泡泡
+  useEffect(() => {
+    const pool =
+      filterEmotion === "all"
+        ? entries
+        : entries.filter((e) => getEmotionFromText(e.summary) === filterEmotion);
+    if (pool.length <= 10) {
+      setVisibleEntries(pool);
+      return;
+    }
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = (batchKey + i * 7) % (i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    setVisibleEntries(shuffled.slice(0, 10));
+  }, [entries, filterEmotion, batchKey]);
 
   const handleBubbleClick = useCallback(
     (id: string, themeColor: string, event: React.MouseEvent) => {
@@ -124,7 +138,30 @@ export default function EmotionBubbles({
 
   const handleBurstComplete = useCallback(() => {
     setBurst(null);
-  }, []);
+    if (!poppedId) return;
+    // 在被戳破的位置补一个新的泡泡，其余保持不变
+    setVisibleEntries((prev) => {
+      const idx = prev.findIndex((e) => e.id === poppedId);
+      if (idx === -1) return prev;
+      const pool =
+        filterEmotion === "all"
+          ? entries
+          : entries.filter((e) => getEmotionFromText(e.summary) === filterEmotion);
+      const usedIds = new Set(prev.map((e) => e.id));
+      usedIds.delete(poppedId);
+      const candidates = pool.filter((e) => !usedIds.has(e.id));
+      if (!candidates.length) {
+        const next = [...prev];
+        next.splice(idx, 1);
+        return next;
+      }
+      const replacement = candidates[Math.floor(Math.random() * candidates.length)];
+      const next = [...prev];
+      next[idx] = replacement;
+      return next;
+    });
+    // 不立刻清除 poppedId，保持正文卡片仍显示；关闭卡片时再清
+  }, [entries, filterEmotion, poppedId]);
 
   const closeContent = useCallback(() => setPoppedId(null), []);
 
@@ -149,6 +186,13 @@ export default function EmotionBubbles({
             {opt.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setBatchKey((k) => k + 1)}
+          className="ml-4 px-4 py-2 rounded-full text-sm font-medium bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white/90 transition-all"
+        >
+          换一批
+        </button>
       </div>
 
       <div
@@ -161,27 +205,27 @@ export default function EmotionBubbles({
           </span>
         </div>
 
-        {/* 气泡层：仅渲染当前筛选情感 */}
+        {/* 气泡层：仅渲染当前筛选情感的最多 10 个随机气泡 */}
         <div className="absolute inset-0">
           <AnimatePresence mode="popLayout">
-            {filteredEntries.map((entry, index) => {
-            const emotion = getEmotionFromText(entry.summary) as EmotionKey;
-            const theme = getTheme(emotion);
-            const layout = bubbleLayout(index, filteredEntries.length);
-            if (poppedId === entry.id) return null;
-            return (
-              <EmotionBubble
-                key={entry.id}
-                id={entry.id}
-                theme={theme}
-                size={layout.size}
-                x={layout.x}
-                y={layout.y}
-                blobSeed={index * 7}
-                onClick={(e) => handleBubbleClick(entry.id, theme.color, e)}
-              />
-            );
-          })}
+            {visibleEntries.map((entry, index) => {
+              const emotion = getEmotionFromText(entry.summary) as EmotionKey;
+              const theme = getTheme(emotion);
+              const layout = bubbleLayout(index, visibleEntries.length);
+              if (poppedId === entry.id) return null;
+              return (
+                <EmotionBubble
+                  key={entry.id}
+                  id={entry.id}
+                  theme={theme}
+                  size={layout.size}
+                  x={layout.x}
+                  y={layout.y}
+                  blobSeed={index * 7}
+                  onClick={(e) => handleBubbleClick(entry.id, theme.color, e)}
+                />
+              );
+            })}
           </AnimatePresence>
         </div>
 

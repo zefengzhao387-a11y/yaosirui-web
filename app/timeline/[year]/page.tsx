@@ -36,10 +36,10 @@ function CameraRig({ targetPos, onComplete, controlsRef }: { targetPos: [number,
       // 目标相机位置：计算从原点出发经过目标点的向量，并极大幅度延伸距离
       const dir = targetVec.clone().normalize();
       if (targetVec.length() < 0.1) {
-        targetCameraPos.set(0, 0, 100);
+        targetCameraPos.set(0, 0, 120);
       } else {
-        // 延伸 100 个单位，提供极致的远距离全景质感
-        targetCameraPos.copy(targetVec).add(dir.multiplyScalar(100));
+        // 延伸到适中的远景距离，避免相机跑到星空外面
+        targetCameraPos.copy(targetVec).add(dir.multiplyScalar(120));
       }
       
       // 平滑移动相机位置
@@ -92,14 +92,16 @@ function FloatingMemory({
   return (
     <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
       <group ref={groupRef} position={position}>
-        <Html transform distanceFactor={40} occlude>
+        {/* 关闭 occlude，避免相机移动时频繁判定遮挡导致闪烁 */}
+        {/* 同时保持 transform + distanceFactor 以获得稳定的 3D 射影效果 */}
+        <Html transform distanceFactor={40}>
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="w-64 sm:w-72 glass rounded-2xl overflow-hidden border border-white/20 cursor-pointer shadow-2xl"
+            className="relative w-64 sm:w-72 glass rounded-2xl overflow-hidden border border-white/20 cursor-pointer shadow-2xl"
             onClick={onClick}
           >
             {memory.type === "image" && (
-              <div className="aspect-[4/3] overflow-hidden bg-black/20">
+              <div className="relative aspect-[4/3] overflow-hidden bg-black/20">
                 <img
                   src={memory.url}
                   alt={memory.title}
@@ -109,6 +111,12 @@ function FloatingMemory({
                   decoding="async"
                   fetchPriority="low"
                 />
+                {/* 顶部日期标签，永远贴在图片之上 */}
+                {memory.date && (
+                  <div className="absolute left-3 top-3 px-2.5 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/30 text-[10px] font-medium text-white/90 tracking-[0.2em] uppercase">
+                    {memory.date}
+                  </div>
+                )}
               </div>
             )}
             <div className="p-3 bg-black/40 backdrop-blur-md">
@@ -190,7 +198,15 @@ function SlowRotatingStars() {
   });
   return (
     <group ref={groupRef}>
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      <Stars
+        radius={110}
+        depth={60}
+        count={5200}
+        factor={3.2}  // 星点整体略大一些，保持梦幻感
+        saturation={0}
+        fade
+        speed={1}
+      />
     </group>
   );
 }
@@ -215,7 +231,7 @@ function TimelineScene({
 }) {
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 0, 30]} fov={50} />
+      <PerspectiveCamera makeDefault position={[0, 0, 36]} fov={50} />
       <CameraRig targetPos={targetClusterPos} onComplete={() => setTargetClusterPos(null)} controlsRef={controlsRef} />
       <SlowRotatingStars />
       <ambientLight intensity={1.5} />
@@ -235,10 +251,10 @@ function TimelineScene({
       <OrbitControls
         ref={controlsRef}
         makeDefault
-        enablePan={true}
-        enableZoom={true}
-        maxDistance={100}
-        minDistance={2}
+        enablePan
+        enableZoom
+        maxDistance={140} // 限制最大拉远距离，避免相机跑到星空外层
+        minDistance={4}
       />
     </>
   );
@@ -702,33 +718,37 @@ export default function ClusterPage({ params }: { params: Promise<{ year: string
         </button>
       </div>
 
-      {/* UI Overlay - 提高 z-index 并确保点击区域正确 */}
+      {/* UI Overlay - 提高 z-index 并确保点击区域正确；年份区预留顶部空间避免被导航栏挡住 */}
       <div className="absolute inset-0 z-50 pointer-events-none p-8 flex flex-col">
-        <div className="flex items-center justify-between pointer-events-none">
-          <div className="text-right">
-            <h1 className="text-7xl font-serif text-white opacity-20">{year}</h1>
-            <p className="text-morandi-sage uppercase tracking-[0.3em] text-xs">Memory Cluster Spheres</p>
+        <div className="flex items-center justify-between pointer-events-none pt-24">
+          <div>
+            <h1 className="text-7xl font-serif text-white opacity-20 select-none" aria-hidden>{year}</h1>
+            <p className="text-morandi-sage uppercase tracking-[0.3em] text-xs mt-1">Memory Cluster Spheres 记忆星团球体</p>
           </div>
         </div>
 
-        {/* 右侧日期导航 */}
-        <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col gap-3 pointer-events-auto z-50">
-          <div className="text-white/40 text-[10px] uppercase tracking-widest mb-2 font-bold text-right">Navigate Dates</div>
-          {groupedMemories.map((group) => (
-            <motion.button
-              key={group.date}
-              whileHover={{ x: -5, backgroundColor: "rgba(255,255,255,0.2)" }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDateClick(group.pos);
-              }}
-              className="flex items-center justify-end gap-3 px-5 py-2.5 rounded-full border border-white/20 glass text-white/70 hover:text-white transition-all group shadow-lg"
-            >
-              <span className="text-xs font-serif">{group.date}</span>
-              <div className="w-2 h-2 rounded-full bg-morandi-sage group-hover:scale-150 transition-transform shadow-[0_0_10px_rgba(155,176,165,0.8)]" />
-            </motion.button>
-          ))}
+        {/* 右侧日期导航（可滚动列表，适配大量日记） */}
+        <div className="absolute right-8 top-1/2 -translate-y-1/2 pointer-events-auto z-50 flex flex-col items-end">
+          <div className="text-white/40 text-[10px] uppercase tracking-widest mb-2 font-bold text-right">
+            Navigate Dates
+          </div>
+          <div className="max-h-[70vh] overflow-y-auto pr-1 flex flex-col gap-3">
+            {groupedMemories.map((group) => (
+              <motion.button
+                key={group.date}
+                whileHover={{ x: -5, backgroundColor: "rgba(255,255,255,0.2)" }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDateClick(group.pos);
+                }}
+                className="flex items-center justify-end gap-3 px-5 py-2.5 rounded-full border border-white/20 glass text-white/70 hover:text-white transition-all group shadow-lg"
+              >
+                <span className="text-xs font-serif">{group.date}</span>
+                <div className="w-2 h-2 rounded-full bg-morandi-sage group-hover:scale-150 transition-transform shadow-[0_0_10px_rgba(155,176,165,0.8)]" />
+              </motion.button>
+            ))}
+          </div>
         </div>
 
         {memories.length === 0 && !isCreating && (
