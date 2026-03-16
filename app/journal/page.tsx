@@ -239,58 +239,7 @@ export default function JournalPage() {
             </div>
             <div className="flex-1 overflow-y-auto pr-1 max-h-80 text-sm leading-relaxed text-white/90 text-left">
               {content.trim() ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                  components={{
-                    h1: ({ node, ...props }) => (
-                      <h1 className="text-2xl font-serif mb-3 border-b border-white/10 pb-1" {...props} />
-                    ),
-                    h2: ({ node, ...props }) => (
-                      <h2 className="text-xl font-serif mb-2 mt-3" {...props} />
-                    ),
-                    p: ({ node, ...props }) => <p className="mb-2" {...props} />,
-                    strong: ({ node, ...props }) => <strong className="font-semibold text-white" {...props} />,
-                    em: ({ node, ...props }) => <em className="italic text-white/90" {...props} />,
-                    blockquote: ({ node, ...props }) => (
-                      <blockquote
-                        className="relative border-l-4 border-morandi-sage/70 pl-3 py-2 my-3 bg-white/5 rounded-r-xl text-white/80 italic before:absolute before:-top-2 before:left-2 before:h-4 before:w-10 before:bg-morandi-sage/20 before:rotate-[-8deg] before:rounded-sm before:shadow-sm"
-                        {...props}
-                      />
-                    ),
-                    ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-2" {...props} />,
-                    ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-2" {...props} />,
-                    code: ({ node, ...props }) => (
-                      <code
-                        className="px-1 py-0.5 rounded bg-white/10 text-[0.8em]"
-                        {...props}
-                      />
-                    ),
-                    img: ({ node, ...props }) => {
-                      const rawSrc = (props as any).src as string | undefined;
-                      if (!rawSrc) return null;
-
-                      let src = rawSrc;
-                      if (rawSrc.startsWith("inline-image-")) {
-                        const index = Number(rawSrc.replace("inline-image-", ""));
-                        if (Number.isFinite(index) && inlineImages[index]) {
-                          src = inlineImages[index];
-                        } else {
-                          return null;
-                        }
-                      }
-
-                      // 使用 span 而不是 div，避免成为 <p> 的非法子元素
-                      return (
-                        <span className="inline-block my-3">
-                          <span className="relative inline-block rounded-2xl border border-white/15 bg-black/40 overflow-hidden shadow-[0_14px_30px_rgba(0,0,0,0.5)] before:absolute before:-top-2 before:left-4 before:h-5 before:w-12 before:bg-morandi-warmBeige/60 before:rotate-[-12deg] before:shadow-md before:rounded-sm">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className="max-h-72 object-contain" src={src} alt={(props as any).alt || ""} />
-                          </span>
-                        </span>
-                      );
-                    },
-                  }}
-                >
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                   {content}
                 </ReactMarkdown>
               ) : (
