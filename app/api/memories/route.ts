@@ -45,11 +45,17 @@ export async function GET(request: Request) {
   const year = url.searchParams.get("year") ?? "";
   const monthDay = url.searchParams.get("date");
   const all = url.searchParams.get("all") === "1";
+  const vaultOnly = url.searchParams.get("vault") === "1";
 
-  // 情感气泡用：拉取全部记忆（不限年份）
+  // 情感气泡 / 阁楼用：拉取全部记忆（不限年份）
   if (all) {
+    const whereAll: any = { userId };
+    if (vaultOnly) {
+      whereAll.encrypted = true;
+      whereAll.isPrivate = true;
+    }
     const list = await prisma.memory.findMany({
-      where: { userId },
+      where: whereAll,
       orderBy: { date: "desc" },
       take: 100,
     });
@@ -63,6 +69,11 @@ export async function GET(request: Request) {
         year: String(m.date.getFullYear()),
         location: m.location ?? "",
         text: m.content ?? "",
+        isPrivate: m.isPrivate,
+        encrypted: m.encrypted,
+        ciphertext: m.ciphertext ?? undefined,
+        iv: m.iv ?? undefined,
+        salt: m.salt ?? undefined,
       })),
     });
   }
@@ -133,6 +144,11 @@ export async function POST(request: Request) {
   const text = typeof body.text === "string" ? body.text : "";
   const location = typeof body.location === "string" ? body.location : null;
   const url = typeof body.url === "string" ? body.url : "";
+  const isPrivate = body.isPrivate === true;
+  const encrypted = body.encrypted === true;
+  const ciphertext = typeof body.ciphertext === "string" ? body.ciphertext : null;
+  const iv = typeof body.iv === "string" ? body.iv : null;
+  const salt = typeof body.salt === "string" ? body.salt : null;
 
   if (!/^\d{4}$/.test(year)) {
     return NextResponse.json({ error: "year 必须是 4 位数字" }, { status: 400 });
@@ -171,6 +187,11 @@ export async function POST(request: Request) {
       date: dt,
       imageUrl: url || null,
       location,
+      isPrivate,
+      encrypted,
+      ciphertext,
+      iv,
+      salt,
       userId,
     },
   });
@@ -185,6 +206,8 @@ export async function POST(request: Request) {
         date: toMonthDay(created.date),
         location: created.location ?? "",
         text: created.content ?? "",
+        isPrivate: created.isPrivate,
+        encrypted: created.encrypted,
       },
     },
     { status: 201 }

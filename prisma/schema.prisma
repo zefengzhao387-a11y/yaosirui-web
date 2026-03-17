@@ -14,14 +14,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  memories  Memory[]
-  yearSummaries YearSummary[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String        @id @default(cuid())
+  email           String        @unique
+  password        String
+  name            String?
+  memories        Memory[]
+  yearSummaries   YearSummary[]
+  // 密闭阁楼二次密码（可选）
+  vaultPasswordHash String?
+  vaultSalt          String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 model Memory {
@@ -31,6 +34,13 @@ model Memory {
   date      DateTime
   imageUrl  String?
   location  String?
+  // 密闭阁楼相关
+  isPrivate Boolean  @default(false) // 是否仅阁楼可见
+  encrypted Boolean  @default(false) // 是否经过内容加密
+  ciphertext String?                 // 加密后的密文（Base64）
+  iv         String?                 // AES-GCM 向量（Base64）
+  salt       String?                 // KDF 盐（Base64，用于从阁楼密码导出密钥）
+
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())

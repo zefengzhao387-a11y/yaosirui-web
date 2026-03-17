@@ -9,6 +9,8 @@ import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 import { getEmotionFromText, getTheme } from "@/lib/emotion";
 import Starfield from "@/components/Starfield";
+import { useVault } from "@/components/VaultContext";
+import { encryptText } from "@/lib/vaultCrypto";
 
 function formatToday() {
   const d = new Date();
@@ -30,6 +32,8 @@ export default function JournalPage() {
   const [stampPressKey, setStampPressKey] = useState(0);
   const [inlineImages, setInlineImages] = useState<string[]>([]);
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const { isUnlocked, unlock, getPassword } = useVault();
+  const [saveToVault, setSaveToVault] = useState(false);
 
   const emotionKey = getEmotionFromText(content || title);
   const theme = getTheme(emotionKey);
@@ -54,17 +58,49 @@ export default function JournalPage() {
     // 触发印章按压动画
     setStampPressKey((k) => k + 1);
     try {
+      let payload: any = {
+        year,
+        date: md,
+        title: trimmedTitle,
+        text: trimmedContent,
+        location: null,
+        url: "",
+      };
+
+      if (saveToVault) {
+        let pwd = getPassword();
+        if (!pwd) {
+          const input = window.prompt("请输入阁楼密码，用于加密这条心语：");
+          if (!input) {
+            setSaving(false);
+            return;
+          }
+          const ok = await unlock(input);
+          if (!ok) {
+            alert("阁楼密码错误，未保存。");
+            setSaving(false);
+            return;
+          }
+          pwd = input;
+        }
+        if (pwd) {
+          const encrypted = await encryptText(trimmedContent, pwd);
+          payload = {
+            ...payload,
+            text: "",
+            isPrivate: true,
+            encrypted: true,
+            ciphertext: encrypted.ciphertext,
+            iv: encrypted.iv,
+            salt: encrypted.salt,
+          };
+        }
+      }
+
       const res = await fetch("/api/memories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          year,
-          date: md,
-          title: trimmedTitle,
-          text: trimmedContent,
-          location: null,
-          url: "",
-        }),
+        body: JSON.stringify(payload),
       });
       const text = await res.text();
       let data: any = null;
@@ -256,6 +292,18 @@ export default function JournalPage() {
               <Save className="w-4 h-4" />
               {saving ? "保存中…" : "保存心语"}
             </button>
+            <div className="mt-3 text-xs text-white/60 flex items-center gap-2">
+              <input
+                id="save-to-vault"
+                type="checkbox"
+                checked={saveToVault}
+                onChange={(e) => setSaveToVault(e.target.checked)}
+                className="rounded border-white/30 bg-transparent"
+              />
+              <label htmlFor="save-to-vault" className="cursor-pointer">
+                存入密闭阁楼（仅自己可见，内容将以阁楼密码加密）
+              </label>
+            </div>
           </motion.div>
         </section>
 

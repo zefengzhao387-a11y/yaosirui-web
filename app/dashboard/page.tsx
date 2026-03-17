@@ -13,7 +13,8 @@ import EmotionBubblesBackground from "@/components/home/EmotionBubblesBackground
 import EmotionBubbles from "@/components/EmotionBubbles";
 import { motion, useScroll, useSpring } from "framer-motion";
 import Link from "next/link";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import { ArrowLeft, LayoutGrid, Lock } from "lucide-react";
+import { useState } from "react";
 
 export default function DashboardPage() {
   const { scrollYProgress } = useScroll();
@@ -22,6 +23,41 @@ export default function DashboardPage() {
     damping: 30,
     restDelta: 0.001,
   });
+  const [vaultDialogOpen, setVaultDialogOpen] = useState(false);
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [savingVault, setSavingVault] = useState(false);
+
+  const handleSaveVaultPassword = async () => {
+    if (!newPwd || newPwd.length < 4) {
+      alert("新阁楼密码至少 4 位。");
+      return;
+    }
+    setSavingVault(true);
+    try {
+      const res = await fetch("/api/vault/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldPassword: oldPwd || undefined,
+          newPassword: newPwd,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        alert(data?.error || "设置阁楼密码失败");
+        return;
+      }
+      alert("阁楼密码已更新。请务必牢记，否则将无法解锁密闭阁楼中的内容。");
+      setVaultDialogOpen(false);
+      setOldPwd("");
+      setNewPwd("");
+    } catch {
+      alert("网络异常，稍后再试。");
+    } finally {
+      setSavingVault(false);
+    }
+  };
 
   return (
     <main className="relative min-h-screen bg-[#050505] transition-colors duration-700">
@@ -39,7 +75,7 @@ export default function DashboardPage() {
 
       {/* Content */}
       <div className="relative z-10">
-        {/* 顶部：返回首页 + 标题 + 时空轴入口 */}
+        {/* 顶部：返回首页 + 标题 + 时空轴入口 + 阁楼密码设置 */}
         <header className="sticky top-0 z-20 px-4 py-4 flex items-center justify-between max-w-6xl mx-auto border-b border-white/5 bg-black/30 backdrop-blur-xl">
           <Link
             href="/"
@@ -49,13 +85,23 @@ export default function DashboardPage() {
             返回首页
           </Link>
           <h1 className="text-xl font-serif text-white">我的主页</h1>
-          <Link
-            href="/timeline"
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-sm font-medium hover:bg-white/15 transition-all active:scale-95"
-          >
-            <LayoutGrid className="w-4 h-4" />
-            多维时空轴
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setVaultDialogOpen(true)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-white/20 text-[11px] text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <Lock className="w-3 h-3" />
+              设置阁楼密码
+            </button>
+            <Link
+              href="/timeline"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-sm font-medium hover:bg-white/15 transition-all active:scale-95"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              多维时空轴
+            </Link>
+          </div>
         </header>
 
         {/* Bento Grid */}
@@ -97,6 +143,53 @@ export default function DashboardPage() {
           <p>© 2026 Time Capsule: Eternal Symphony. All rights reserved.</p>
         </footer>
       </div>
+
+      {vaultDialogOpen && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur">
+          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-white/10 p-6 space-y-4 shadow-2xl">
+            <h2 className="text-lg font-serif text-white flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              设置阁楼密码
+            </h2>
+            <p className="text-xs text-white/60 leading-relaxed">
+              阁楼密码用于加密你的私密心语。请务必牢记，忘记后将无法解锁密闭阁楼中的内容。
+            </p>
+            <div className="space-y-2">
+              <input
+                type="password"
+                placeholder="旧阁楼密码（第一次设置可留空）"
+                className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-sm text-white placeholder:text-white/30"
+                value={oldPwd}
+                onChange={(e) => setOldPwd(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="新阁楼密码（至少 4 位）"
+                className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-sm text-white placeholder:text-white/40"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setVaultDialogOpen(false)}
+                className="px-3 py-1.5 rounded-full text-xs text-white/60 hover:bg-white/5 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveVaultPassword}
+                disabled={savingVault}
+                className="px-4 py-1.5 rounded-full bg-white text-black text-xs font-semibold hover:bg-morandi-cream disabled:opacity-60"
+              >
+                {savingVault ? "保存中…" : "保存阁楼密码"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

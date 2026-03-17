@@ -5,11 +5,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { VaultUnlockModal } from "./VaultUnlockModal";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<{ id: string; email: string; name: string | null } | null>(null);
   const router = useRouter();
+  const [showVaultUnlock, setShowVaultUnlock] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -61,15 +63,19 @@ export default function Navbar() {
           <Link href="/journal" className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide">
             心语瓶
           </Link>
-          {["阁楼", "留言"].map((item) => (
-            <Link 
-              key={item} 
-              href={`#${item}`} 
-              className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide"
-            >
-              {item}
-            </Link>
-          ))}
+          <button
+            type="button"
+            onClick={() => setShowVaultUnlock(true)}
+            className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide"
+          >
+            阁楼
+          </button>
+          <Link 
+            href="#留言" 
+            className="text-white/70 hover:text-white transition-colors text-sm font-medium tracking-wide"
+          >
+            留言
+          </Link>
           {user ? (
             <div className="flex items-center gap-4">
               <span className="text-white/70 text-sm">
@@ -114,11 +120,19 @@ export default function Navbar() {
           <Link href="/journal" className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
             心语瓶
           </Link>
-          {["阁楼", "留言"].map((item) => (
-            <Link key={item} href={`#${item}`} className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
-              {item}
-            </Link>
-          ))}
+          <button
+            type="button"
+            className="text-2xl font-serif text-white hover:text-morandi-sage transition-colors text-left"
+            onClick={() => {
+              setIsOpen(false);
+              setShowVaultUnlock(true);
+            }}
+          >
+            阁楼
+          </button>
+          <Link href="#留言" className="text-2xl font-serif text白 hover:text-morandi-sage transition-colors" onClick={() => setIsOpen(false)}>
+            留言
+          </Link>
           {user ? (
             <>
               <Link
@@ -147,6 +161,7 @@ export default function Navbar() {
           )}
         </motion.div>
       )}
+      <VaultUnlockModal open={showVaultUnlock} onClose={() => setShowVaultUnlock(false)} />
     </nav>
   );
 }

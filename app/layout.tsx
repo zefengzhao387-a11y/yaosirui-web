@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { VaultProvider } from "@/components/VaultContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,8 +28,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={`${inter.variable} ${playfair.variable} antialiased min-h-screen relative`}>
-        <Navbar />
-        {children}
+        <VaultProvider>
+          <Navbar />
+          {children}
+        </VaultProvider>
       </body>
     </html>
   );
