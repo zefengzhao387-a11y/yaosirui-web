@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const session = await getSession();
+    const user = session?.user;
     if (!user) {
       return NextResponse.json({ ok: false, error: "未登录" }, { status: 401 });
     }

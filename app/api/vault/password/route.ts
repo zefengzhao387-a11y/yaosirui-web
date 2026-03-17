@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth"; // 假设已有获取当前用户的工具
+import prisma from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
+    const session = await getSession();
+    const user = session?.user;
     if (!user) {
       return NextResponse.json({ hasPassword: false }, { status: 401 });
     }
@@ -22,7 +23,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const session = await getSession();
+    const user = session?.user;
     if (!user) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
