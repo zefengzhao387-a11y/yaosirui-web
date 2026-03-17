@@ -19,7 +19,7 @@ export function VaultUnlockModal({ open, onClose }: VaultUnlockModalProps) {
   const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const inputsRef = useRef<HTMLInputElement[]>([]);
 
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
@@ -231,7 +231,11 @@ export function VaultUnlockModal({ open, onClose }: VaultUnlockModalProps) {
               {pin.map((v, i) => (
                 <input
                   key={i}
-                  ref={(el) => (inputsRef.current[i] = el)}
+                  ref={(el) => {
+                    if (el) {
+                      inputsRef.current[i] = el;
+                    }
+                  }}
                   type="password"
                   inputMode="numeric"
                   maxLength={1}
